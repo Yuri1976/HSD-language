@@ -1,0 +1,3 @@
+sit a = 2 + 3 * 4
+sit b = 3.14 - 1.0
+sit c = (a >= b) et non falsum

@@ -1,0 +1,12 @@
+# Il primo programma HSD interattivo
+
+munus factorial(n: numerus) -> numerus
+    si n <= 1
+        redde 1
+    aliter
+        redde n * factorial(n - 1)
+
+munus principale() -> nihil
+    sit testo = lege("Inserisci un numero: ")
+    sit n = numerus_ex(testo)
+    scribe("Il fattoriale di ", n, " e' ", factorial(n))

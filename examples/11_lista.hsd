@@ -1,0 +1,7 @@
+# Somma dei numeri da 1 a 10, con il ciclo 'per'
+
+munus principale() -> nihil
+    sit sum = 0
+    per i in numera(1, 10)
+        sum = sum + i
+    scribe("La somma da 1 a 10 e' ", sum)

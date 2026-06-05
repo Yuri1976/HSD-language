@@ -1,0 +1,48 @@
+# ============================================================
+#  .gitignore for HSD — Hic Sunt Dracones
+#  Tells Git which files NOT to track: source code is kept,
+#  generated files (binaries, temporaries) are excluded.
+# ============================================================
+
+# --- Cargo build output ---
+# Once you move from `rustc` to Cargo, the /target folder
+# will hold all build artifacts: always exclude it.
+/target/
+
+# --- Executables produced directly by `rustc` ---
+# Compiling with `rustc lexer.rs` creates an executable in the
+# project folder. Track the SOURCE (.rs), never the binaries.
+/lexer
+/lexer.exe
+/lexer.pdb
+/parser
+/parser.exe
+/parser.pdb
+/hsd
+/hsd.exe
+*.out
+
+# Personal files not for the repo
+_*/
+_*
+
+# --- rustfmt temporary files ---
+*.rs.bk
+
+# --- Editor / IDE files ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Operating system files ---
+.DS_Store
+Thumbs.db
+
+# ============================================================
+#  NOTE — Cargo.lock is intentionally NOT listed here.
+#  HSD is an application (a compiler), not a library: for
+#  applications Cargo.lock SHOULD be committed, so the build
+#  is reproducible. Keep it tracked by Git.
+# ============================================================

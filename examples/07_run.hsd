@@ -1,0 +1,15 @@
+munus principale() -> nihil
+    sit x = 5
+    sit y = x * 3
+    scribe("x = ", x)
+    scribe("y = ", y)
+
+    si y > 10
+        scribe("y is greater than 10")
+    aliter
+        scribe("y is small")
+
+    sit i = 0
+    dum i < 3
+        scribe("loop iteration ", i)
+        i = i + 1

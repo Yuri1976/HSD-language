@@ -1,0 +1,11 @@
+nuntius Increment
+
+actor Counter
+    sit value: numerus = 0
+
+    accipe Increment
+        value = value + 1
+
+munus principale() -> nihil
+    sit c = crea Counter
+    mitte Increment ad c

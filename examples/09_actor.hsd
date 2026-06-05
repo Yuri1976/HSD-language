@@ -1,0 +1,20 @@
+# An actor with state, exercised by messages
+
+nuntius Increment
+nuntius Show
+
+actor Counter
+    sit value: numerus = 0
+
+    accipe Increment
+        value = value + 1
+
+    accipe Show
+        scribe("counter value: ", value)
+
+munus principale() -> nihil
+    sit c = crea Counter
+    mitte Increment ad c
+    mitte Increment ad c
+    mitte Increment ad c
+    mitte Show ad c

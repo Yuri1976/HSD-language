@@ -1,0 +1,7 @@
+munus test() -> numerus
+    sit x = 5
+    sit y = "hello"
+    sit z = x + y
+    si x
+        redde y
+    redde verum

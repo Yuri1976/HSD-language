@@ -1,0 +1,11 @@
+munus square(n: numerus) -> numerus
+    redde n * n
+
+munus sum_to(n: numerus) -> numerus
+    si n <= 0
+        redde 0
+    redde n + sum_to(n - 1)
+
+munus principale() -> nihil
+    scribe("square(7) = ", square(7))
+    scribe("sum_to(10) = ", sum_to(10))

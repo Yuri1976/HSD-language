@@ -1,0 +1,5 @@
+munus test() -> nihil
+    si verum
+        si verum
+            scribe("profondo")
+    redde nihil
