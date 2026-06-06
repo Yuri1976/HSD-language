@@ -1,48 +1,27 @@
 # HSD — Hic Sunt Dracones
 
-> *"Here be dragons"* — the note medieval cartographers placed on the
-> unexplored edges of their maps. A new programming language is exactly
-> that: uncharted territory.
+> *Hic Sunt Dracones* — "here be dragons", the Latin phrase that
+> medieval cartographers wrote across the unmapped regions of their
+> maps.
 
-HSD is a general-purpose programming language with a **Latin-keyword
-syntax**. The goal: as simple and flexible as Python, as fast and powerful
-as C. Multi-paradigm, statically typed, compiled.
+HSD is a small, statically typed compiled programming language with
+Latin keywords and native actor-based concurrency. It reads like
+Python, runs like C, and treats actors as a first-class language
+construct rather than a library feature.
 
-> **Status:** early development. Phase 1 (the lexer) is complete.
-> This is a long-term project built step by step.
+This is a personal project of mine, started over five years ago in C,
+recently revived and rewritten in Rust. It runs end-to-end today —
+source files lex, parse, type-check, and either execute through a
+tree-walking interpreter or compile to native executables through a
+C backend. Several pieces of the original design (automatic memory
+management, true actor concurrency) are still on paper. The rest
+works.
 
 ---
 
-## Design philosophy
+## A taste of the language
 
-Three principles guide every decision:
-
-1. **One thing, one way** — for each problem, one obvious solution.
-2. **Zero-cost abstractions** — high-level constructs compile to the same
-   code you would write by hand in C.
-3. **Static types, but invisible** — you write `sit x = 5`, not the type.
-   Type inference does the work; the simplicity is in not *writing* types,
-   not in their absence.
-
-## Key characteristics
-
-- **Latin keyword syntax** — `munus` (function), `sit` (variable),
-  `si`/`aliter` (if/else), `dum` (while), and so on.
-- **Indentation-based blocks** — no curly braces, like Python.
-- **Compiled** — HSD transpiles to C, reusing mature C compilers
-  (GCC/Clang) for native speed. An LLVM backend may follow.
-- **Memory management** — Automatic Reference Counting (ARC) by default,
-  with an explicit `nativum` opt-out to manual memory for hot sections.
-- **Concurrency** — the actor model: isolated actors that communicate by
-  messages, with no shared memory and therefore no data races by default.
-- **Multi-paradigm** — imperative core, lightweight OOP via `genus`,
-  functional features.
-
-## A taste of HSD
-
-```hsd
-# Compute a factorial
-
+```romanes
 munus factorial(n: numerus) -> numerus
     si n <= 1
         redde 1
@@ -50,95 +29,171 @@ munus factorial(n: numerus) -> numerus
         redde n * factorial(n - 1)
 
 munus principale() -> nihil
-    sit result = factorial(5)
-    scribe("Factorial of 5: ", result)
+    per i in numera(1, 6)
+        scribe("factorial(", i, ") = ", factorial(i))
 ```
 
-With actors:
+Output:
 
-```hsd
-nuntius Increment
-
-actor Counter
-    sit value: numerus = 0
-
-    accipe Increment
-        value = value + 1
-
-munus principale() -> nihil
-    sit c = crea Counter
-    mitte Increment ad c
 ```
+factorial(1) = 1
+factorial(2) = 2
+factorial(3) = 6
+factorial(4) = 24
+factorial(5) = 120
+```
+
+Latin keywords, Python-style indentation, Rust-style type
+annotations on function signatures with inference inside.
 
 ---
 
-## Building and running
+## Setting up
 
-The compiler is written in **Rust**. At this stage only the lexer exists;
-it reads a `.hsd` file and prints the tokens it produces.
+### Requirements
+
+- **Rust toolchain** (1.70 or newer). Install from
+  [rustup.rs](https://rustup.rs/) if you do not have it.
+- **A C compiler**, needed for the backend to produce executables:
+  - Linux: `gcc` (usually pre-installed) or `clang`
+  - macOS: `clang` (comes with Xcode Command Line Tools)
+  - Windows: Microsoft Visual C++ Build Tools (`cl`), or MinGW
+
+### Building HSD
+
+Clone the repository and build the compiler:
 
 ```sh
-rustc lexer.rs
-./lexer examples/factorial.hsd
+git clone https://github.com/Yuri1976/HSD-language.git
+cd HSD-language
+cargo build --release
 ```
 
-A C compiler (GCC or Clang) will become a requirement later, once the
-C backend is in place.
+The compiler binary will be in `target/release/`.
+
+### Running an example through the interpreter
+
+The fastest way to try HSD: pass a source file to `cargo run`, with
+no extra arguments, and the interpreter executes it directly.
+
+```sh
+cargo run -- examples/factorial.hsd
+```
+
+### Compiling to a native executable
+
+Use the `build` subcommand to translate HSD to C, then compile it
+with your platform's C compiler.
+
+**On Linux or macOS:**
+
+```sh
+cargo run -- build examples/factorial.hsd
+gcc examples/factorial.c runtime/runtime.c -I runtime -o factorial
+./factorial
+```
+
+**On Windows (Developer PowerShell for VS):**
+
+```powershell
+cargo run -- build examples\factorial.hsd
+cl examples\factorial.c runtime\runtime.c /I runtime
+.\factorial.exe
+```
+
+The `build` step produces a `.c` file next to the source. The C
+compiler then links it with the HSD runtime library to produce a
+standalone native executable.
 
 ---
 
-## Roadmap
+## Project status
 
-The compiler is built in phases. Each phase is decoupled from the next.
+HSD is in active development. The compiler works, the language runs,
+but several foundational features are still being implemented. The
+[roadmap](HSD-roadmap.md) tracks what is done, what is in progress,
+and what is planned.
 
-| Phase | Goal | Status |
-|-------|------|--------|
-| 0 | Design on paper — EBNF grammar | done |
-| 1 | Lexer — source text to tokens | done |
-| 2 | Parser — tokens to an AST | next |
-| 3 | Semantic analysis — name resolution, type inference | planned |
-| 4 | Tree-walking interpreter — the language runs | planned |
-| 5 | Intermediate representation + C backend | planned |
-| 6 | Standard library + tooling | planned |
+Current state in brief:
+- Lexer, parser, semantic analyzer, interpreter, and C backend
+  all working end-to-end.
+- Phase 6 (ARC — automatic reference counting) is in progress. Until
+  it lands, the C backend leaks heap memory; small programs are
+  fine, long-running ones accumulate.
+- Phase 7 (error handling) is in progress.
 
-The pipeline:
-
-```
-source .hsd
-  -> lexer        (Phase 1)
-  -> parser       (Phase 2)
-  -> semantics    (Phase 3)
-  -> lowering/IR  (Phase 5)
-  -> C backend    (Phase 5)   ->  emits a .c file
-                                  -> GCC/Clang -> native executable
-```
-
-## Long-term vision
-
-HSD's distinctive thesis: Latin is an **inflected** language — a word's
-form carries its grammatical role. The plan is to make this a real feature
-through the **macro system**, letting users define constructs that exploit
-cases and verb forms. The language *core* stays small and fixed; the
-inflectional richness lives in metaprogramming, opt-in for those who want
-it. No English-based language can imitate this.
+This is a project in motion, not a finished tool. Expect rough edges.
 
 ---
 
-## Project structure
+## Documentation
 
-```
-.
-├── lexer.rs                  # Phase 1 — the lexer
-├── examples/                 # sample .hsd programs
-│   └── factorial.hsd
-├── HSD-grammatica-EBNF.md     # Phase 0 — the formal grammar
-├── HSD-scheda-progetto.md     # design sheet: philosophy, roadmap, vision
-├── .gitignore
-└── README.md
-```
+The four documents in this repository cover different aspects of HSD.
+Each one is meant to stand on its own.
+
+- **[HSD-project-overview.md](HSD-project-overview.md)** — the *what*.
+  The project's design philosophy, language at a glance, compiler
+  architecture, implementation status, long-term vision, and the
+  languages and books that shaped HSD.
+
+- **[HSD-grammar-EBNF.md](HSD-grammar-EBNF.md)** — the *how to
+  write it*. The formal grammar in EBNF notation, the reference
+  document for parsing.
+
+- **[HSD-language-comparison.md](HSD-language-comparison.md)** — the
+  *where it stands*. A side-by-side comparison with Python, C, and
+  Rust, with worked examples (factorial, basic and interactive) and
+  systematic tables across paradigms, types, vocabularies, and
+  features.
+
+- **[HSD-roadmap.md](HSD-roadmap.md)** — the *where it's going*.
+  Known issues, priority tiers, the sequential roadmap with 35+
+  numbered phases, self-hosting milestones, and small demonstrator
+  programs for each phase.
+
+- **[HSD-memory-model.md](HSD-memory-model.md)** — the *how it
+  thinks about memory*. A standalone explanation of HSD's memory
+  management strategy (ARC), why it was chosen, where its limits
+  are, and how those limits will be addressed.
+
+If you only have time for one document, start with the project
+overview. If you are curious about the technical decisions, the
+memory model document is the deepest dive available.
+
+---
+
+## Examples
+
+The `examples/` directory contains small programs that exercise
+specific language features:
+
+- `factorial.hsd` — recursion, integer arithmetic, the `per` loop
+- `09_actor.hsd` — an actor with state and message handlers
+- `10_input.hsd` — reading from standard input, parsing
+- `11_lista.hsd` — list construction, iteration, summation
+- `08_functions.hsd` — function definitions and calls
+
+Each of these can be run through the interpreter or compiled
+through the C backend using the commands above.
+
+---
+
+## Contributing
+
+HSD is a personal project and not yet structured for outside
+contributions. The roadmap is the founder's path; pull requests
+that align with it are welcome but not solicited. If you have
+questions, suggestions, or want to discuss design choices, opening
+an issue is the right place.
 
 ---
 
 ## License
 
-Not yet chosen. To be decided before the repository is made public.
+HSD is released under the MIT License. See
+[LICENSE](LICENSE) for the full text.
+
+---
+
+*The dragons are a little more mapped than they were five years
+ago, but the map is far from finished.*

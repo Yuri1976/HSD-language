@@ -261,6 +261,15 @@ which makes the parser and analyzer milestones much nicer.*
 number, plus, minus, times, divide); a shape area calculator using
 variants.
 
+**Phase 15b — Weak references (tenuus).** Add weak reference type to the language. 
+Each heap-allocated object tracks the weak references pointing to it;
+when the strong refcount goes to zero, the runtime sets all those 
+weaks to nihil before freeing. Solves memory leaks from cycles in 
+graph-like data structures (parent-child, doubly-linked lists, observer patterns). 
+Demonstrators: a doubly-linked list using weak parent pointers; 
+a tree where children weakly reference their parent; demonstrate
+that all three cleanly release memory when the root goes out of scope.
+
 **Phase 16 — Maps.** Hash maps in the language and the C backend.
 *Unblocks: symbol tables in the self-hosted semantic analyzer.*
 *Demonstrators:* a word-frequency counter (using a map instead of
