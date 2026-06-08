@@ -1,0 +1,24 @@
+# ============================================================
+# HSD — Hic Sunt Dracones
+# 12_arc_stress.hsd — stress test for Phase 6b ARC integration
+#
+# Creates and discards many lists in a loop. Without ARC, this
+# leaks memory (each `numera` call allocates that's never freed).
+# With ARC, memory usage should stay constant.
+#
+# To verify on Linux/macOS:
+#   gcc 12_arc_stress.c runtime/runtime.c -I runtime -o stress
+#   /usr/bin/time -v ./stress     # check "Maximum resident set size"
+#
+# On Windows: Task Manager → look at memory while running.
+# ============================================================
+
+munus principale() -> nihil
+    sit total = 0
+    sit i = 0
+    dum i < 100000
+        sit lista = numera(1, 100)
+        per x in lista
+            total = total + x
+        i = i + 1
+    scribe("done, total: ", total)

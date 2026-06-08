@@ -10,15 +10,84 @@
 #ifndef HSD_RUNTIME_H
 #define HSD_RUNTIME_H
 
+#include <stddef.h>
+
+/* ============================================================
+ * ARC — Automatic Reference Counting (Phase 6a)
+ *
+ * Every heap-allocated value in HSD carries a reference count in
+ * the 8 bytes immediately preceding the user-visible pointer.
+ * The compiler emits retain/release calls automatically; the HSD
+ * programmer never sees them.
+ *
+ * Layout of an ARC-allocated block:
+ *
+ *     +---------------+----------------------+
+ *     | refcount (8B) | actual data (N B)    |
+ *     +---------------+----------------------+
+ *                     ^
+ *                     User-visible pointer
+ *
+ * NOTE: refcounts are non-atomic in this phase. When Phase 21
+ * (real actor concurrency) lands, they will become atomic.
+ * Currently HSD's actors are synchronous, so no concurrent
+ * access to refcounts is possible.
+ *
+ * NOTE: reference cycles are not handled. Cyclic data structures
+ * will leak until Phase 15b introduces weak references
+ * (`tenuus[T]`). See HSD-memory-model.md for the full design.
+ * ============================================================ */
+
+/*
+ * hsd_arc_alloc: allocate `size` bytes for the user, plus an
+ * 8-byte refcount header. The returned pointer points to the
+ * user data area. The refcount is initialized to 1 (the caller
+ * owns the only reference).
+ *
+ * Returns NULL only if the underlying malloc fails (and dies).
+ */
+void* hsd_arc_alloc(size_t size);
+
+/*
+ * hsd_arc_retain: increment the refcount of an ARC-tracked
+ * object. Safe to call with NULL (does nothing).
+ */
+void hsd_arc_retain(void* ptr);
+
+/*
+ * hsd_arc_release: decrement the refcount of an ARC-tracked
+ * object. If the count reaches zero, the object is freed.
+ * Safe to call with NULL (does nothing).
+ */
+void hsd_arc_release(void* ptr);
+
+/*
+ * hsd_arc_refcount: read the current refcount of an object.
+ * Intended for debugging and tests only. Not used by generated
+ * code.
+ */
+long hsd_arc_refcount(void* ptr);
+
+/*
+ * hsd_arc_copy_str: copy a C string into ARC-allocated memory.
+ * Used by the compiler to wrap string literals so all const char*
+ * values in generated code are uniformly ARC-tracked.
+ * The result has refcount 1.
+ */
+const char* hsd_arc_copy_str(const char* s);
+
+/* ============================================================
+ * I/O and conversions
+ * ============================================================ */
+
 /*
  * hsd_lege: read one line from stdin.
  *   - If `prompt` is not NULL, it is printed first (with no newline)
  *     and the output is flushed so the user sees it.
- *   - The returned string is heap-allocated. The trailing newline
+ *   - The returned string is ARC-allocated. The trailing newline
  *     (and \r on Windows) is removed.
- *   - NOTE: in this phase we LEAK the buffer on each call. ARC
- *     (automatic reference counting) will manage strings later.
- *   - NOTE 2: ARC still not implemented
+ *   - The caller owns one reference; the compiler emits the
+ *     appropriate retain/release calls.
  */
 const char* hsd_lege(const char* prompt);
 
@@ -36,11 +105,16 @@ long hsd_numerus_ex(const char* s);
  */
 double hsd_realis_ex(const char* s);
 
+/* ============================================================
+ * Lists
+ * ============================================================ */
+
 /*
  * hsd_list_num: a list of numerus (long).
- *   - `data` points to a heap-allocated array of `len` longs.
- *   - NOTE: like strings, lists currently leak. ARC will manage
- *     them later.
+ *   - `data` points to an ARC-allocated array of `len` longs.
+ *   - The struct itself is a value type (passed by copy), but
+ *     `data` is ARC-tracked. The compiler emits retain/release
+ *     on `data` at the appropriate scope boundaries.
  */
 typedef struct {
     long* data;
@@ -49,7 +123,8 @@ typedef struct {
 
 /*
  * hsd_numera: produce the list [a, a+1, ..., b] (b inclusive).
- *   - If b < a, returns an empty list.
+ *   - If b < a, returns an empty list (data = NULL, len = 0).
+ *   - The data array is ARC-allocated with refcount 1.
  */
 hsd_list_num hsd_numera(long a, long b);
 

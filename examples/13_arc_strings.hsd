@@ -1,0 +1,32 @@
+# ============================================================
+# HSD — Hic Sunt Dracones
+# 13_arc_strings.hsd — stress test for Phase 6c (strings ARC)
+#                        and Phase 6d (reassignment release)
+#
+# Exercises:
+#   - string literals stored in variables (Phase 6c wraps them
+#     in hsd_arc_copy_str)
+#   - reassignment of heap variables (Phase 6d releases the old)
+#   - mix of strings and lists in one program
+#
+# Memory should stay constant across many iterations.
+# ============================================================
+
+munus principale() -> nihil
+    sit count = 0
+    sit i = 0
+    dum i < 1000
+        # String literal stored in a variable (Phase 6c)
+        sit msg = "iteration in progress"
+        
+        # Reassignment of a heap variable (Phase 6d releases the old)
+        msg = "iteration nearly done"
+        
+        # A list and a string together
+        sit nums = numera(1, 50)
+        per x in nums
+            count = count + 1
+        
+        i = i + 1
+    
+    scribe("completed iterations: ", count)
