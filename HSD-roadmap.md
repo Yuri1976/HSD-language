@@ -184,30 +184,37 @@ The order of work, in dependency-respecting phases. Numbering
 continues from Phase 5c, the most recent completed phase.
 Self-hosting milestones are marked **⭐**.
 
-**Phase 6 — ARC** *(in progress)***.** Reference counting for all
+~~**Phase 6 — ARC.**~~ ✅ *Completed.* Reference counting for all
 heap-allocated values. Retain/release inserted by the C backend at
-the appropriate places. Cycle detection deferred (cycles are rare in
-HSD's value-oriented design). *Unblocks: everything downstream — no
-real program can run without solid memory management.*
-*Demonstrators:* stress test — create and discard 10,000 strings,
-validate memory returns to baseline; build and tear down a one-million
-node linked list.
+the appropriate places. Memory stable at ~0.1 MB across stress tests
+of 100k+ iterations. ARC covers strings (`verba`), lists
+(`series[numerus]`), actor pointers, and genus records.
+*Demonstrators:* stress test (100k+ strings, memory returns to
+baseline); one-million node linked list build and teardown.
 
-**Phase 7 — Error handling** *(in progress)***.** Minimal first
-pass. Decide between Go-style multiple return
-(`munus f() -> numerus, error`) and a `Result` type before starting.
-Standard-library functions like `numerus_ex` become recoverable.
+**Phase 7 — Error handling** *(in progress — deliberately
+deferred).* Implementation deferred until after Phase 15. Reason:
+implementing `Result`-style error handling before variant types exist
+would mean doing the work twice. Go-style multiple return was
+considered and rejected for the same reason. Phase 7 will be
+completed immediately after Phase 15 lands, using `Result[T, E]`
+backed by real variant types. The phase is marked in-progress to
+signal the intent; no code will be written here until Phase 15 is
+done.
 *Unblocks: writing a compiler that reports errors instead of crashing.*
 *Demonstrators:* a calculator REPL that handles invalid input
 gracefully; a number-guessing game with proper input validation.
 
-**Phase 8 — `genus` end-to-end.** Record types fully working in
-interpreter and C backend. Field access, construction, equality. The
-first composite user-defined type. *Unblocks: representing structured
-data — tokens, AST nodes, symbol-table entries.*
-*Demonstrators:* a small address book (Person records, list of them,
-print formatted); a basic geometry library (Point, Circle, Rectangle
-with area/perimeter).
+~~**Phase 8 — `genus` end-to-end.**~~ ✅ *Completed.* Record types
+fully working in interpreter and C backend. Named-argument
+construction (`crea Persona(nome: "Mario", eta: 30)`), field access,
+field assignment, structural equality, ARC-tracked heap allocation.
+String equality in the C backend uses `strcmp`. Float output format
+aligned between interpreter and C backend (`%.7g`).
+*Demonstrators:* `examples/rubrica.hsd` (address book);
+`examples/geometria.hsd` (Point, Circle, Rectangle with
+area/perimeter). Both produce identical output in interpreter and
+C backend.
 
 **Phase 9 — Module system.** A working `affer`, namespace separation,
 multi-file compilation. *Unblocks: splitting both the standard
@@ -223,6 +230,13 @@ slicing, concatenation, formatting), list operations
 (map/filter/reduce/sort), math (sqrt, pow, log, sin/cos, random).
 *Demonstrators:* a word-count tool (reads stdin, splits into words,
 counts and prints); a simple `grep`-like text filter.
+
+**Phase 10b — UTF-8 support.** Full Unicode support in the runtime
+and codegen. `SetConsoleOutputCP(65001)` in the Windows `main`
+bridge. UTF-8 validation in the lexer. Correct `verba` length
+semantics (characters vs bytes). `lege` reading full Unicode
+codepoints. Scheduled here because string handling is already being
+formalized in Phase 10. *See also: `HSD-known-issues.md`.*
 
 **Phase 11 — Polymorphic series + list literals in backend.** Bring
 the C backend up to interpreter parity for collection types.

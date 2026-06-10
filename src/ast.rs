@@ -1,5 +1,6 @@
 // ============================================================
-//  HSD — Hic Sunt Dracones 
+//  HSD — Hic Sunt Dracones
+//  Phase 2: the AST (Abstract Syntax Tree)
 //
 //  This file defines the SHAPE of the tree. It contains no
 //  logic: only the data structures the parser will build.
@@ -65,14 +66,13 @@ pub struct Field {
 }
 
 // ---------- Actor ----------
-// An actor has internal state and message handlers.
-// State entries are `sit`/`fixum` declarations (Stmt::Let):
-// an actor's state needs initial values.
+// An actor has internal state (fields) and message handlers.
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActorDef {
     pub name: String,
-    pub state: Vec<Stmt>,        // each entry is a Stmt::Let
+    pub state: Vec<Stmt>,        // sit/fixum declarations (actor state)
+    pub fields: Vec<Field>,      // typed field declarations (unused for now)
     pub handlers: Vec<Handler>,
 }
 
@@ -213,10 +213,13 @@ pub enum Expr {
     // list literal: [a, b, c]
     List(Vec<Expr>),
 
-    // crea Name(args...) : spawn an actor
+    // crea Name(field: expr, ...) : construct a genus record or spawn an actor.
+    // Arguments are always named. Actors (which take no arguments) use an
+    // empty list. For genus records, order is free; the interpreter/codegen
+    // match by field name, not position.
     Create {
         name: String,
-        args: Vec<Expr>,
+        args: Vec<(String, Expr)>,   // (field_name, value_expr)
     },
 }
 

@@ -1,0 +1,32 @@
+# Phase 8c demonstrator 1 — rubrica
+# Exercises: genus with verba/numerus fields, list of records,
+# named construction, field access, passing records to functions.
+
+genus Persona
+    nome: verba
+    cognome: verba
+    telefono: verba
+
+munus stampa_persona(p: Persona) -> nihil
+    scribe(p.nome, " ", p.cognome, " — ", p.telefono)
+
+munus principale() -> nihil
+    sit rubrica: series[numerus] = numera(0, -1)
+
+    sit p1 = crea Persona(nome: "Mario",  cognome: "Rossi",   telefono: "333-111-2222")
+    sit p2 = crea Persona(nome: "Laura",  cognome: "Bianchi", telefono: "347-555-6666")
+    sit p3 = crea Persona(nome: "Giulio", cognome: "Verdi",   telefono: "320-999-0000")
+
+    scribe("--- Rubrica ---")
+    stampa_persona(p1)
+    stampa_persona(p2)
+    stampa_persona(p3)
+
+    scribe("--- Cerca: cognome Bianchi ---")
+    si p2.cognome == "Bianchi"
+        scribe("Trovato: ", p2.nome, " ", p2.cognome)
+        scribe("Telefono: ", p2.telefono)
+
+    scribe("--- Aggiorna telefono ---")
+    p1.telefono = "333-000-1111"
+    stampa_persona(p1)
