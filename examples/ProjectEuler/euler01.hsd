@@ -1,0 +1,8 @@
+munus principale() -> nihil
+    sit somma = 0
+    sit x = 1
+    dum x < 1000
+        si x % 3 == 0 vel x % 5 == 0
+            somma = somma + x
+        x = x + 1
+    scribe("Risultato: ", somma)
