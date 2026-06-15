@@ -1,6 +1,6 @@
 // ============================================================
 //  HSD — Hic Sunt Dracones
-//  the PARSER (expressions)
+//  Phase 2: the PARSER (expressions)
 //
 //  Turns a list of tokens into an AST. This file handles
 //  EXPRESSIONS, using a "Pratt parser" to get operator
@@ -203,14 +203,15 @@ impl Parser {
             Token::Ipse        => { self.advance(); Ok(Expr::Ipse) }
             Token::Ident(name) => { self.advance(); Ok(Expr::Ident(name)) }
 
-            // crea Name(args...) : spawn an actor
+            // crea Name(field: expr, ...) : construct a genus record or spawn an actor.
+            // Actors take no arguments; genus records use named arguments.
             Token::Crea => {
                 self.advance();
-                let name = self.parse_ident("an actor name after 'crea'")?;
+                let name = self.parse_ident("a genus or actor name after 'crea'")?;
                 let mut args = Vec::new();
                 if self.check(&Token::LParen) {
                     self.advance();
-                    args = self.parse_args(&Token::RParen)?;
+                    args = self.parse_named_args()?;
                     self.expect(&Token::RParen, "')'")?;
                 }
                 Ok(Expr::Create { name, args })
@@ -248,6 +249,27 @@ impl Parser {
         }
         loop {
             args.push(self.parse_expr()?);
+            if self.check(&Token::Comma) {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        Ok(args)
+    }
+
+    // Named arguments for `crea`: `field: expr, field: expr, ...`
+    // An empty list is valid (for actors that take no arguments).
+    fn parse_named_args(&mut self) -> Result<Vec<(String, Expr)>, String> {
+        let mut args = Vec::new();
+        if self.check(&Token::RParen) {
+            return Ok(args);
+        }
+        loop {
+            let field = self.parse_ident("a field name")?;
+            self.expect(&Token::Colon, "':' after the field name")?;
+            let value = self.parse_expr()?;
+            args.push((field, value));
             if self.check(&Token::Comma) {
                 self.advance();
             } else {
@@ -366,7 +388,7 @@ impl Parser {
             }
         }
         self.expect(&Token::Dedent, "the end of the actor")?;
-        Ok(ActorDef { name, state, handlers })
+        Ok(ActorDef { name, state, fields: Vec::new(), handlers })
     }
 
     // A message handler: `accipe Message(params) <block>`

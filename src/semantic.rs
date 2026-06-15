@@ -1,8 +1,8 @@
 // ============================================================
 //  HSD — Hic Sunt Dracones
-//  SEMANTIC ANALYSIS
-//      name resolution  (every name used must be declared)
-//      type checking    (every operation must be type-valid)
+//  Phase 3: SEMANTIC ANALYSIS
+//    3a — name resolution  (every name used must be declared)
+//    3b — type checking    (every operation must be type-valid)
 //
 //  All errors are collected, then reported together.
 // ============================================================
@@ -678,18 +678,45 @@ impl Analyzer {
             }
 
             Expr::Create { name, args } => {
-                for a in args {
-                    self.type_of(a);
+                // Type-check all argument expressions first.
+                for (_, expr) in args {
+                    self.type_of(expr);
                 }
                 let kind = self.table.lookup(name).map(|i| i.kind.clone());
                 match kind {
-                    Some(SymbolKind::Actor) => Ty::Actor(name.clone()),
+                    Some(SymbolKind::Actor) => {
+                        if !args.is_empty() {
+                            self.errors.push(format!(
+                                "Actor '{}' is created without arguments", name
+                            ));
+                        }
+                        Ty::Actor(name.clone())
+                    }
+                    Some(SymbolKind::Genus { fields }) => {
+                        // Check that every supplied field exists in the genus.
+                        for (field_name, _) in args {
+                            if !fields.iter().any(|(f, _)| f == field_name) {
+                                self.errors.push(format!(
+                                    "'crea {}': unknown field '{}'", name, field_name
+                                ));
+                            }
+                        }
+                        // Check that every required field is supplied.
+                        for (field_name, _) in &fields {
+                            if !args.iter().any(|(k, _)| k == field_name) {
+                                self.errors.push(format!(
+                                    "'crea {}': missing field '{}'", name, field_name
+                                ));
+                            }
+                        }
+                        Ty::Genus(name.clone())
+                    }
                     None => {
-                        self.errors.push(format!("Use of undeclared actor '{}'", name));
+                        self.errors.push(format!("Use of undeclared type '{}'", name));
                         Ty::Unknown
                     }
                     Some(_) => {
-                        self.errors.push(format!("'{}' is not an actor", name));
+                        self.errors.push(format!("'{}' is not a genus or actor", name));
                         Ty::Unknown
                     }
                 }

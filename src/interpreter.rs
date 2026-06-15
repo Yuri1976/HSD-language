@@ -1,6 +1,6 @@
 // ============================================================
 //  HSD — Hic Sunt Dracones
-//  the INTERPRETER (with actors)
+//  Phase 4c: the INTERPRETER (with actors)
 //
 //  Adds a SIMPLIFIED, SYNCHRONOUS actor model:
 //   - `crea` builds an actor instance with its own state
@@ -10,7 +10,7 @@
 //
 //  This gives actors their SEMANTICS (state + handlers +
 //  identity), not yet true concurrency. Real parallelism —
-//  mailboxes, a scheduler, OS threads — future runtime
+//  mailboxes, a scheduler, OS threads — is Phase 5 runtime
 //  work.
 // ============================================================
 
@@ -35,7 +35,17 @@ pub enum Value {
     // mutable IDENTITY: copying the Value copies the handle,
     // not the actor — both refer to the same actor.
     Actor(Rc<RefCell<ActorInstance>>),
+    // A genus record instance. Rc<RefCell<...>> gives it reference
+    // semantics: assigning a record copies the handle, not the data.
+    Record(Rc<RefCell<RecordInstance>>),
     Nihil,
+}
+
+// A live genus record: its type name and its current field values.
+#[derive(Debug)]
+pub struct RecordInstance {
+    pub type_name: String,
+    pub fields: HashMap<String, Value>,
 }
 
 // A live actor: its type and its current state.
@@ -60,6 +70,15 @@ impl Value {
                 format!("[{}]", parts.join(", "))
             }
             Value::Actor(rc) => format!("<actor {}>", rc.borrow().type_name),
+            Value::Record(rc) => {
+                let r = rc.borrow();
+                let mut parts: Vec<String> = r.fields
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v.display()))
+                    .collect();
+                parts.sort(); // stable display order
+                format!("{}({})", r.type_name, parts.join(", "))
+            }
         }
     }
 }
@@ -73,6 +92,18 @@ fn values_equal(a: &Value, b: &Value) -> bool {
         (Value::Nihil, Value::Nihil) => true,
         // two actors are equal only if they are the SAME actor
         (Value::Actor(x), Value::Actor(y)) => Rc::ptr_eq(x, y),
+        // two records are equal if they are the same instance (identity),
+        // or if they have the same type and all fields are equal
+        (Value::Record(x), Value::Record(y)) => {
+            if Rc::ptr_eq(x, y) { return true; }
+            let rx = x.borrow();
+            let ry = y.borrow();
+            if rx.type_name != ry.type_name { return false; }
+            if rx.fields.len() != ry.fields.len() { return false; }
+            rx.fields.iter().all(|(k, v)| {
+                ry.fields.get(k).map_or(false, |w| values_equal(v, w))
+            })
+        }
         _ => false,
     }
 }
@@ -138,6 +169,7 @@ pub struct Interpreter {
     env: Environment,
     functions: HashMap<String, Function>,
     actors: HashMap<String, ActorDef>,
+    genera: HashMap<String, GenusDef>,      // Phase 8: genus definitions
     current_actor: Option<Value>, // the actor whose handler is running ('ipse')
 }
 
@@ -147,12 +179,13 @@ impl Interpreter {
             env: Environment::new(),
             functions: HashMap::new(),
             actors: HashMap::new(),
+            genera: HashMap::new(),
             current_actor: None,
         }
     }
 
     pub fn run(&mut self, program: &Program) -> Result<(), String> {
-        // collect functions and actor definitions
+        // collect functions, actor definitions, and genus definitions
         for item in &program.items {
             match item {
                 Item::Function(f) => {
@@ -160,6 +193,9 @@ impl Interpreter {
                 }
                 Item::Actor(a) => {
                     self.actors.insert(a.name.clone(), a.clone());
+                }
+                Item::Genus(g) => {
+                    self.genera.insert(g.name.clone(), g.clone());
                 }
                 _ => {}
             }
@@ -230,6 +266,42 @@ impl Interpreter {
 
         let instance = ActorInstance { type_name: name.to_string(), state };
         Ok(Value::Actor(Rc::new(RefCell::new(instance))))
+    }
+
+    // `crea Name(field: expr, ...)` : construct a genus record.
+    fn create_record(&mut self, name: &str, args: &[(String, Expr)]) -> Result<Value, String> {
+        let def = match self.genera.get(name) {
+            Some(d) => d.clone(),
+            None => return Err(format!("'crea': unknown genus '{}'", name)),
+        };
+
+        // Check that every supplied field exists in the genus definition.
+        for (field_name, _) in args {
+            if !def.fields.iter().any(|f| &f.name == field_name) {
+                return Err(format!(
+                    "'crea {}': unknown field '{}'", name, field_name
+                ));
+            }
+        }
+
+        // Check that every required field has been supplied.
+        for field in &def.fields {
+            if !args.iter().any(|(k, _)| k == &field.name) {
+                return Err(format!(
+                    "'crea {}': missing field '{}'", name, field.name
+                ));
+            }
+        }
+
+        // Evaluate argument expressions and build the field map.
+        let mut fields = HashMap::new();
+        for (field_name, expr) in args {
+            let v = self.eval_expr(expr)?;
+            fields.insert(field_name.clone(), v);
+        }
+
+        let instance = RecordInstance { type_name: name.to_string(), fields };
+        Ok(Value::Record(Rc::new(RefCell::new(instance))))
     }
 
     // `mitte message ad target` : run the matching handler.
@@ -354,7 +426,27 @@ impl Interpreter {
                             ));
                         }
                     }
-                    _ => return Err("only variables can be assigned for now".to_string()),
+                    Expr::Field { object, name: field_name } => {
+                        // Evaluate the object to get the record, then update the field.
+                        let obj_val = self.eval_expr(object)?;
+                        match obj_val {
+                            Value::Record(rc) => {
+                                let mut r = rc.borrow_mut();
+                                if !r.fields.contains_key(field_name.as_str()) {
+                                    return Err(format!(
+                                        "record '{}' has no field '{}'",
+                                        r.type_name, field_name
+                                    ));
+                                }
+                                r.fields.insert(field_name.clone(), v);
+                            }
+                            other => return Err(format!(
+                                "field assignment '{}' on a non-record value: {}",
+                                field_name, other.display()
+                            )),
+                        }
+                    }
+                    _ => return Err("invalid assignment target".to_string()),
                 }
                 Ok(Flow::Normal)
             }
@@ -546,17 +638,38 @@ impl Interpreter {
             }
 
             Expr::Create { name, args } => {
-                if !args.is_empty() {
-                    return Err(
-                        "actors are created without arguments; their state \
-                         is set by their 'sit' fields".to_string()
-                    );
+                // Is this a genus record or an actor?
+                if self.genera.contains_key(name.as_str()) {
+                    self.create_record(name, args)
+                } else {
+                    // actor: named args must be empty
+                    if !args.is_empty() {
+                        return Err(
+                            "actors are created without arguments; their state \
+                             is set by their 'sit' fields".to_string()
+                        );
+                    }
+                    self.create_actor(name)
                 }
-                self.create_actor(name)
             }
 
-            Expr::Field { .. } => {
-                Err("field access runs in a later phase".to_string())
+            Expr::Field { object, name } => {
+                let val = self.eval_expr(object)?;
+                match val {
+                    Value::Record(rc) => {
+                        match rc.borrow().fields.get(name.as_str()) {
+                            Some(v) => Ok(v.clone()),
+                            None => Err(format!(
+                                "record '{}' has no field '{}'",
+                                rc.borrow().type_name, name
+                            )),
+                        }
+                    }
+                    other => Err(format!(
+                        "field access '{}' on a non-record value: {}",
+                        name, other.display()
+                    )),
+                }
             }
         }
     }

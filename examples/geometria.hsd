@@ -1,0 +1,54 @@
+# Phase 8c demonstrator 2 — geometria
+# Exercises: multiple genus in one program, realis fields,
+# functions computing from record fields, field access on realis.
+
+genus Punto
+    x: realis
+    y: realis
+
+genus Cerchio
+    cx: realis
+    cy: realis
+    raggio: realis
+
+genus Rettangolo
+    x: realis
+    y: realis
+    larghezza: realis
+    altezza: realis
+
+munus area_cerchio(c: Cerchio) -> realis
+    redde 3.14159 * c.raggio * c.raggio
+
+munus perimetro_cerchio(c: Cerchio) -> realis
+    redde 2.0 * 3.14159 * c.raggio
+
+munus area_rettangolo(r: Rettangolo) -> realis
+    redde r.larghezza * r.altezza
+
+munus perimetro_rettangolo(r: Rettangolo) -> realis
+    redde 2.0 * (r.larghezza + r.altezza)
+
+munus distanza(a: Punto, b: Punto) -> realis
+    sit dx = a.x - b.x
+    sit dy = a.y - b.y
+    redde dx * dx + dy * dy
+
+munus principale() -> nihil
+    sit c = crea Cerchio(cx: 0.0, cy: 0.0, raggio: 5.0)
+    scribe("Cerchio raggio 5:")
+    scribe("  area      = ", area_cerchio(c))
+    scribe("  perimetro = ", perimetro_cerchio(c))
+
+    sit r = crea Rettangolo(x: 0.0, y: 0.0, larghezza: 4.0, altezza: 3.0)
+    scribe("Rettangolo 4x3:")
+    scribe("  area      = ", area_rettangolo(r))
+    scribe("  perimetro = ", perimetro_rettangolo(r))
+
+    sit p1 = crea Punto(x: 0.0, y: 0.0)
+    sit p2 = crea Punto(x: 3.0, y: 4.0)
+    scribe("Distanza^2 (0,0)-(3,4) = ", distanza(p1, p2))
+
+    r.larghezza = 6.0
+    scribe("Rettangolo dopo modifica (6x3):")
+    scribe("  area      = ", area_rettangolo(r))
