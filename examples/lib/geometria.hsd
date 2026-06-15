@@ -1,0 +1,9 @@
+genus Punto
+    x: realis
+    y: realis
+
+genus Cerchio
+    raggio: realis
+
+munus area_cerchio(c: Cerchio) -> realis
+    redde 3.14159 * c.raggio * c.raggio

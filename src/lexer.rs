@@ -1,12 +1,13 @@
 // ============================================================
 //  HSD — Hic Sunt Dracones
-//  the LEXER
+//  Phase 1: the LEXER
 //  Turns source text into a list of tokens.
 //
-//  This is the lexer MODULE (used by main.rs via `mod lexer;`).
-//  Build the whole project with: cargo build
+//  Build with:  rustc lexer.rs
+//  Run with:    ./lexer examples/test.hsd
 // ============================================================
 
+// Standard library modules used in main:
 
 // ---------- Tokens ----------
 // A Token is "one of" many possible things: a keyword, a
@@ -105,11 +106,9 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(source: &str) -> Lexer {
-        // Normalize line endings before lexing. Windows uses
-        // "\r\n" and old Mac systems used "\r"; we turn both
-        // into "\n" so the rest of the lexer only ever deals
-        // with a single newline character.
-        let normalized = source.replace("\r\n", "\n").replace('\r', "\n");
+        // Normalize line endings: strip \r so that \r\n (Windows) and
+        // \n (Unix) are both handled identically throughout the lexer.
+        let normalized: String = source.chars().filter(|&c| c != '\r').collect();
         Lexer {
             src: normalized.chars().collect(),
             pos: 0,
@@ -195,18 +194,17 @@ impl Lexer {
 
     fn handle_indentation(&mut self) -> Result<(), String> {
         loop {
-            // count the leading spaces
+            // Count leading whitespace. Tabs are treated as 4 spaces each,
+            // which is the most common editor default and avoids ambiguity.
+            // Mixing tabs and spaces on the same line is accepted as long as
+            // the resulting column count is consistent.
             let mut count = 0;
-            while self.peek() == Some(' ') {
-                self.advance();
-                count += 1;
-            }
-            // tabs are not allowed in indentation (ambiguous)
-            if self.peek() == Some('\t') {
-                return Err(format!(
-                    "Line {}: use spaces, not tabs, for indentation",
-                    self.line
-                ));
+            loop {
+                match self.peek() {
+                    Some(' ')  => { self.advance(); count += 1; }
+                    Some('\t') => { self.advance(); count += 4; }
+                    _ => break,
+                }
             }
             // blank or comment-only line: skip it, do not count
             match self.peek() {
@@ -404,4 +402,5 @@ impl Lexer {
         Ok(())
     }
 }
+
 

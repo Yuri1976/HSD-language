@@ -1,0 +1,27 @@
+# Phase 9c demonstrator — multi-file geometry program
+# Imports the geometry library and uses its types and functions.
+
+affer "lib/geometria_lib"
+
+munus principale() -> nihil
+    # cerchio
+    sit c = crea Cerchio(cx: 0.0, cy: 0.0, raggio: 5.0)
+    scribe("Cerchio raggio 5:")
+    scribe("  area      = ", area_cerchio(c))
+    scribe("  perimetro = ", perimetro_cerchio(c))
+
+    # rettangolo
+    sit r = crea Rettangolo(x: 0.0, y: 0.0, larghezza: 4.0, altezza: 3.0)
+    scribe("Rettangolo 4x3:")
+    scribe("  area      = ", area_rettangolo(r))
+    scribe("  perimetro = ", perimetro_rettangolo(r))
+
+    # punti e distanza
+    sit p1 = crea Punto(x: 0.0, y: 0.0)
+    sit p2 = crea Punto(x: 3.0, y: 4.0)
+    scribe("Distanza^2 (0,0)-(3,4) = ", distanza_quadrata(p1, p2))
+
+    # modifica campo e ricalcola
+    r.larghezza = 6.0
+    scribe("Rettangolo dopo modifica (6x3):")
+    scribe("  area      = ", area_rettangolo(r))
