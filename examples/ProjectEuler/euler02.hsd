@@ -1,0 +1,11 @@
+munus principale() -> nihil
+    sit a = 1
+    sit b = 2
+    sit somma = 0
+    dum b < 4000000
+        si b % 2 == 0
+            somma = somma + b
+        sit temp = a + b
+        a = b
+        b = temp
+    scribe("Risultato: ", somma)
