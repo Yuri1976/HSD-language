@@ -128,4 +128,27 @@ typedef struct {
  */
 hsd_list_num hsd_numera(long a, long b);
 
+/* ---- Phase 10: string helpers ---- */
+
+/* hsd_char_at: return the character at position n as a new string. */
+const char* hsd_char_at(const char* s, long n);
+
+/* hsd_tonde: return a trimmed copy of s (no leading/trailing whitespace). */
+const char* hsd_tonde(const char* s);
+
+/* hsd_des: return 1 if s ends with suf, 0 otherwise. */
+int hsd_des(const char* s, const char* suf);
+
+/* hsd_iunge: return a new string that is the concatenation of a and b. */
+const char* hsd_iunge(const char* a, const char* b);
+
 #endif /* HSD_RUNTIME_H */
+
+/* hsd_scinde: split s by sep, returns a list of strings as hsd_list_num
+   (reusing the list struct with pointers cast to long). */
+/* Note: for Phase 10 we return a simple opaque handle; full series[verba]
+   support arrives in Phase 11. For now scinde is interpreter-only in C backend. */
+
+/* hsd_forma: simple {} placeholder substitution. Variadic via sentinel. */
+const char* hsd_forma_2(const char* fmt, const char* a1, const char* a2);
+const char* hsd_forma_1(const char* fmt, const char* a1);

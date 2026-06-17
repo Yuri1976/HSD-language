@@ -214,3 +214,98 @@ hsd_list_num hsd_numera(long a, long b) {
     result.len = count;
     return result;
 }
+
+/* ---- Phase 10: string helpers ---- */
+
+const char* hsd_char_at(const char* s, long n) {
+    long len = (long)strlen(s);
+    if (n < 0 || n >= len) {
+        fprintf(stderr, "ind: index %ld out of bounds (length %ld)\n", n, len);
+        exit(1);
+    }
+    char* result = (char*)hsd_arc_alloc(2);
+    result[0] = s[n];
+    result[1] = '\0';
+    return result;
+}
+
+const char* hsd_tonde(const char* s) {
+    /* skip leading whitespace */
+    while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
+    long len = (long)strlen(s);
+    /* find end of non-whitespace */
+    while (len > 0 && (s[len-1] == ' ' || s[len-1] == '\t' ||
+                        s[len-1] == '\n' || s[len-1] == '\r')) len--;
+    char* result = (char*)hsd_arc_alloc(len + 1);
+    memcpy(result, s, len);
+    result[len] = '\0';
+    return result;
+}
+
+int hsd_des(const char* s, const char* suf) {
+    long slen = (long)strlen(s);
+    long suflen = (long)strlen(suf);
+    if (suflen > slen) return 0;
+    return strcmp(s + slen - suflen, suf) == 0;
+}
+
+const char* hsd_iunge(const char* a, const char* b) {
+    long alen = (long)strlen(a);
+    long blen = (long)strlen(b);
+    char* result = (char*)hsd_arc_alloc(alen + blen + 1);
+    memcpy(result, a, alen);
+    memcpy(result + alen, b, blen);
+    result[alen + blen] = '\0';
+    return result;
+}
+
+const char* hsd_forma_1(const char* fmt, const char* a1) {
+    const char* args[1] = { a1 };
+    int arg_count = 1;
+    /* calculate output length */
+    long outlen = 0;
+    const char* p = fmt;
+    int ai = 0;
+    while (*p) {
+        if (*p == '{' && *(p+1) == '}') {
+            if (ai < arg_count) outlen += strlen(args[ai++]);
+            p += 2;
+        } else { outlen++; p++; }
+    }
+    char* result = (char*)hsd_arc_alloc(outlen + 1);
+    char* out = result;
+    p = fmt; ai = 0;
+    while (*p) {
+        if (*p == '{' && *(p+1) == '}') {
+            if (ai < arg_count) { long l = strlen(args[ai]); memcpy(out, args[ai++], l); out += l; }
+            p += 2;
+        } else { *out++ = *p++; }
+    }
+    *out = '\0';
+    return result;
+}
+
+const char* hsd_forma_2(const char* fmt, const char* a1, const char* a2) {
+    const char* args[2] = { a1, a2 };
+    int arg_count = 2;
+    long outlen = 0;
+    const char* p = fmt;
+    int ai = 0;
+    while (*p) {
+        if (*p == '{' && *(p+1) == '}') {
+            if (ai < arg_count) outlen += strlen(args[ai++]);
+            p += 2;
+        } else { outlen++; p++; }
+    }
+    char* result = (char*)hsd_arc_alloc(outlen + 1);
+    char* out = result;
+    p = fmt; ai = 0;
+    while (*p) {
+        if (*p == '{' && *(p+1) == '}') {
+            if (ai < arg_count) { long l = strlen(args[ai]); memcpy(out, args[ai++], l); out += l; }
+            p += 2;
+        } else { *out++ = *p++; }
+    }
+    *out = '\0';
+    return result;
+}

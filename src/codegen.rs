@@ -88,6 +88,7 @@ impl CodeGen {
         self.out.push_str("#include <stdio.h>\n");
         self.out.push_str("#include <stdlib.h>\n");
         self.out.push_str("#include <string.h>\n");
+        self.out.push_str("#include <math.h>\n");
         self.out.push_str("#include \"runtime.h\"\n\n");
 
         // ---- 2. Genus typedefs (forward declarations) ----
@@ -664,15 +665,33 @@ impl CodeGen {
         let mut fmt = String::new();
         let mut exprs = Vec::new();
         for a in args {
-            let spec = match self.c_type_of_expr(a)?.as_str() {
-                "long" => "%ld",
-                "double" => "%.7g",
-                "int" => "%d",
-                "const char*" => "%s",
-                _ => "%ld",
-            };
-            fmt.push_str(spec);
-            exprs.push(self.gen_expr(a, true)?);
+            let ty = self.c_type_of_expr(a)?;
+            // Booleans from continet/ini/des/== are int in C but should
+            // print as verum/falsum like the interpreter does.
+            let is_bool = ty == "int" && matches!(a,
+                Expr::Call { callee, .. } if matches!(callee.as_ref(),
+                    Expr::Ident(n) if matches!(n.as_str(), "continet"|"ini"|"des")
+                )
+            ) || matches!(a, Expr::Binary { op, .. } if matches!(op,
+                crate::ast::BinOp::Eq | crate::ast::BinOp::Neq |
+                crate::ast::BinOp::Lt | crate::ast::BinOp::Gt |
+                crate::ast::BinOp::Le | crate::ast::BinOp::Ge
+            )) || matches!(a, Expr::BoolLit(_));
+
+            if is_bool {
+                fmt.push_str("%s");
+                exprs.push(format!("({} ? \"verum\" : \"falsum\")", self.gen_expr(a, true)?));
+            } else {
+                let spec = match ty.as_str() {
+                    "long"       => "%ld",
+                    "double"     => "%.7g",
+                    "int"        => "%d",
+                    "const char*"=> "%s",
+                    _            => "%ld",
+                };
+                fmt.push_str(spec);
+                exprs.push(self.gen_expr(a, true)?);
+            }
         }
         fmt.push_str("\\n");
         if exprs.is_empty() {
@@ -774,6 +793,114 @@ impl CodeGen {
                         let b = self.gen_expr(&args[1], true)?;
                         return Ok(format!("hsd_numera({}, {})", a, b));
                     }
+                    // ---- Phase 10: math built-ins ----
+                    if matches!(name.as_str(), "rad"|"log"|"sin"|"cos"|"abs") {
+                        if args.len() != 1 {
+                            return Err(format!("{} expects 1 argument", name));
+                        }
+                        let a = self.gen_expr(&args[0], true)?;
+                        let c_fn = match name.as_str() {
+                            "rad" => "sqrt",
+                            "log" => "log",
+                            "sin" => "sin",
+                            "cos" => "cos",
+                            "abs" => "fabs",
+                            _     => unreachable!(),
+                        };
+                        return Ok(format!("{}((double){})", c_fn, a));
+                    }
+                    if name == "pot" {
+                        if args.len() != 2 {
+                            return Err("pot expects 2 arguments".into());
+                        }
+                        let a = self.gen_expr(&args[0], true)?;
+                        let b = self.gen_expr(&args[1], true)?;
+                        return Ok(format!("pow((double){}, (double){})", a, b));
+                    }
+                    if name == "sors" {
+                        return Ok("((double)rand() / RAND_MAX)".to_string());
+                    }
+                    if matches!(name.as_str(), "min"|"max") {
+                        if args.len() != 2 {
+                            return Err(format!("{} expects 2 arguments", name));
+                        }
+                        let a = self.gen_expr(&args[0], true)?;
+                        let b = self.gen_expr(&args[1], true)?;
+                        return Ok(match name.as_str() {
+                            "min" => format!("((double)({}) < (double)({}) ? (double)({}) : (double)({}))", a, b, a, b),
+                            "max" => format!("((double)({}) > (double)({}) ? (double)({}) : (double)({}))", a, b, a, b),
+                            _ => unreachable!(),
+                        });
+                    }
+                    // ---- Phase 10: string built-ins ----
+                    if name == "lon" {
+                        if args.len() != 1 { return Err("lon expects 1 argument".into()); }
+                        let a = self.gen_expr(&args[0], true)?;
+                        return Ok(format!("((long)strlen({}))", a));
+                    }
+                    if name == "ind" {
+                        if args.len() != 2 { return Err("ind expects 2 arguments".into()); }
+                        let s = self.gen_expr(&args[0], true)?;
+                        let n = self.gen_expr(&args[1], true)?;
+                        // Returns a single-char string on the stack — heap alloc for ARC.
+                        return Ok(format!("hsd_char_at({}, {})", s, n));
+                    }
+                    if name == "scinde" {
+                        if args.len() != 2 { return Err("scinde expects 2 arguments".into()); }
+                        let s = self.gen_expr(&args[0], true)?;
+                        let sep = self.gen_expr(&args[1], true)?;
+                        return Ok(format!("hsd_scinde({}, {})", s, sep));
+                    }
+                    if name == "tonde" {
+                        if args.len() != 1 { return Err("tonde expects 1 argument".into()); }
+                        let a = self.gen_expr(&args[0], true)?;
+                        return Ok(format!("hsd_tonde({})", a));
+                    }
+                    if name == "continet" {
+                        if args.len() != 2 { return Err("continet expects 2 arguments".into()); }
+                        let s = self.gen_expr(&args[0], true)?;
+                        let sub = self.gen_expr(&args[1], true)?;
+                        return Ok(format!("(strstr({}, {}) != NULL)", s, sub));
+                    }
+                    if name == "ini" {
+                        if args.len() != 2 { return Err("ini expects 2 arguments".into()); }
+                        let s = self.gen_expr(&args[0], true)?;
+                        let pre = self.gen_expr(&args[1], true)?;
+                        return Ok(format!("(strncmp({}, {}, strlen({})) == 0)", s, pre, pre));
+                    }
+                    if name == "des" {
+                        if args.len() != 2 { return Err("des expects 2 arguments".into()); }
+                        let s = self.gen_expr(&args[0], true)?;
+                        let suf = self.gen_expr(&args[1], true)?;
+                        return Ok(format!("hsd_des({}, {})", s, suf));
+                    }
+                    if name == "iunge" {
+                        if args.len() != 2 { return Err("iunge expects 2 arguments".into()); }
+                        let a = self.gen_expr(&args[0], true)?;
+                        let b = self.gen_expr(&args[1], true)?;
+                        return Ok(format!("hsd_iunge({}, {})", a, b));
+                    }
+                    if name == "forma" {
+                        // forma in the C backend: not yet supported (requires
+                        // variadic string formatting). Use scribe for output,
+                        // or iunge for simple concatenation. Full support in Phase 11.
+                        return Err(
+                            "'forma' is not yet supported in the C backend. \
+                             Use 'scribe' for output or 'iunge' for concatenation.".into()
+                        );
+                    }
+                    // ---- Phase 10: list built-ins ----
+                    if name == "scinde" {
+                        // scinde returns series[verba] which requires Phase 11.
+                        return Err(
+                            "'scinde' is not yet supported in the C backend (requires Phase 11 series[verba]).".into()
+                        );
+                    }
+                    if name == "ordina" {
+                        if args.len() != 1 { return Err("ordina expects 1 argument".into()); }
+                        let a = self.gen_expr(&args[0], true)?;
+                        return Ok(format!("hsd_ordina({})", a));
+                    }
                     if name == "scribe" {
                         return Err("'scribe' cannot be used as an expression here".into());
                     }
@@ -866,10 +993,21 @@ impl CodeGen {
             Expr::Call { callee, .. } => {
                 if let Expr::Ident(n) = callee.as_ref() {
                     match n.as_str() {
-                        "lege" => return Ok("const char*".into()),
+                        "lege"       => return Ok("const char*".into()),
                         "numerus_ex" => return Ok("long".into()),
-                        "realis_ex" => return Ok("double".into()),
-                        "numera" => return Ok("hsd_list_num".into()),
+                        "realis_ex"  => return Ok("double".into()),
+                        "numera"     => return Ok("hsd_list_num".into()),
+                        // Phase 10 math
+                        "rad"|"log"|"sin"|"cos"|"pot"|"sors"|"abs"|"min"|"max"
+                                     => return Ok("double".into()),
+                        // Phase 10 string
+                        "lon"        => return Ok("long".into()),
+                        "ind"|"tonde"|"iunge"|"forma"
+                                     => return Ok("const char*".into()),
+                        "continet"|"ini"|"des"
+                                     => return Ok("int".into()),
+                        // Phase 10 list
+                        "ordina"     => return Ok("hsd_list_num".into()),
                         _ => {}
                     }
                     Ok(self.func_ret.get(n).cloned().unwrap_or_else(|| "long".into()))

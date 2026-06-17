@@ -606,6 +606,28 @@ impl Interpreter {
                     if name == "realis_ex" {
                         return builtin_realis_ex(&arg_values);
                     }
+                    // ---- Phase 10: math built-ins ----
+                    if name == "rad" { return builtin_rad(&arg_values); }
+                    if name == "pot" { return builtin_pot(&arg_values); }
+                    if name == "log" { return builtin_log(&arg_values); }
+                    if name == "sin" { return builtin_sin(&arg_values); }
+                    if name == "cos" { return builtin_cos(&arg_values); }
+                    if name == "sors" { return builtin_sors(&arg_values); }
+                    if name == "abs" { return builtin_abs(&arg_values); }
+                    if name == "min" { return builtin_min(&arg_values); }
+                    if name == "max" { return builtin_max(&arg_values); }
+                    // ---- Phase 10: string built-ins ----
+                    if name == "lon"     { return builtin_lon(&arg_values); }
+                    if name == "ind"     { return builtin_ind(&arg_values); }
+                    if name == "scinde"  { return builtin_scinde(&arg_values); }
+                    if name == "tonde"   { return builtin_tonde(&arg_values); }
+                    if name == "continet"{ return builtin_continet(&arg_values); }
+                    if name == "ini"     { return builtin_ini(&arg_values); }
+                    if name == "des"     { return builtin_des(&arg_values); }
+                    if name == "iunge"   { return builtin_iunge(&arg_values); }
+                    if name == "forma"   { return builtin_forma(&arg_values); }
+                    // ---- Phase 10: list built-ins ----
+                    if name == "ordina"  { return builtin_ordina(&arg_values); }
                     return self.call_function(name, arg_values);
                 }
                 Err("only named functions can be called".to_string())
@@ -676,6 +698,232 @@ impl Interpreter {
 }
 
 // ---------- Built-in functions ----------
+
+// ============================================================
+//  Phase 10 — math built-ins
+// ============================================================
+
+fn builtin_rad(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Float(x)] => Ok(Value::Float(x.sqrt())),
+        [Value::Int(x)]   => Ok(Value::Float((*x as f64).sqrt())),
+        _ => Err("rad(x) expects one numerus or realis argument".into()),
+    }
+}
+
+fn builtin_pot(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Float(x), Value::Float(n)] => Ok(Value::Float(x.powf(*n))),
+        [Value::Float(x), Value::Int(n)]   => Ok(Value::Float(x.powi(*n as i32))),
+        [Value::Int(x),   Value::Int(n)]   => Ok(Value::Int((*x as i64).pow(*n as u32))),
+        [Value::Int(x),   Value::Float(n)] => Ok(Value::Float((*x as f64).powf(*n))),
+        _ => Err("pot(x, n) expects two numeric arguments".into()),
+    }
+}
+
+fn builtin_log(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Float(x)] => Ok(Value::Float(x.ln())),
+        [Value::Int(x)]   => Ok(Value::Float((*x as f64).ln())),
+        _ => Err("log(x) expects one numeric argument".into()),
+    }
+}
+
+fn builtin_sin(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Float(x)] => Ok(Value::Float(x.sin())),
+        [Value::Int(x)]   => Ok(Value::Float((*x as f64).sin())),
+        _ => Err("sin(x) expects one numeric argument".into()),
+    }
+}
+
+fn builtin_cos(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Float(x)] => Ok(Value::Float(x.cos())),
+        [Value::Int(x)]   => Ok(Value::Float((*x as f64).cos())),
+        _ => Err("cos(x) expects one numeric argument".into()),
+    }
+}
+
+fn builtin_sors(args: &[Value]) -> Result<Value, String> {
+    if !args.is_empty() {
+        return Err("sors() takes no arguments".into());
+    }
+    // Simple LCG random — no external crates needed.
+    use std::time::{SystemTime, UNIX_EPOCH};
+    static SEED: std::sync::atomic::AtomicU64 =
+        std::sync::atomic::AtomicU64::new(0);
+    let mut s = SEED.load(std::sync::atomic::Ordering::Relaxed);
+    if s == 0 {
+        s = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .subsec_nanos() as u64 + 1;
+    }
+    s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    SEED.store(s, std::sync::atomic::Ordering::Relaxed);
+    Ok(Value::Float((s >> 11) as f64 / (1u64 << 53) as f64))
+}
+
+fn builtin_abs(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Float(x)] => Ok(Value::Float(x.abs())),
+        [Value::Int(x)]   => Ok(Value::Int(x.abs())),
+        _ => Err("abs(x) expects one numeric argument".into()),
+    }
+}
+
+fn builtin_min(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Int(a),   Value::Int(b)]   => Ok(Value::Int(*a.min(b))),
+        [Value::Float(a), Value::Float(b)] => Ok(Value::Float(a.min(*b))),
+        [Value::Int(a),   Value::Float(b)] => Ok(Value::Float((*a as f64).min(*b))),
+        [Value::Float(a), Value::Int(b)]   => Ok(Value::Float(a.min(*b as f64))),
+        _ => Err("min(a, b) expects two numeric arguments".into()),
+    }
+}
+
+fn builtin_max(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Int(a),   Value::Int(b)]   => Ok(Value::Int(*a.max(b))),
+        [Value::Float(a), Value::Float(b)] => Ok(Value::Float(a.max(*b))),
+        [Value::Int(a),   Value::Float(b)] => Ok(Value::Float((*a as f64).max(*b))),
+        [Value::Float(a), Value::Int(b)]   => Ok(Value::Float(a.max(*b as f64))),
+        _ => Err("max(a, b) expects two numeric arguments".into()),
+    }
+}
+
+// ============================================================
+//  Phase 10 — string built-ins
+// ============================================================
+
+fn builtin_lon(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Str(s)] => Ok(Value::Int(s.chars().count() as i64)),
+        _ => Err("lon(s) expects one verba argument".into()),
+    }
+}
+
+fn builtin_ind(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Str(s), Value::Int(n)] => {
+            match s.chars().nth(*n as usize) {
+                Some(c) => Ok(Value::Str(c.to_string())),
+                None => Err(format!("ind: index {} out of bounds (length {})",
+                    n, s.chars().count())),
+            }
+        }
+        _ => Err("ind(s, n) expects a verba and a numerus".into()),
+    }
+}
+
+fn builtin_scinde(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Str(s), Value::Str(sep)] => {
+            let parts: Vec<Value> = s.split(sep.as_str())
+                .map(|p| Value::Str(p.to_string()))
+                .collect();
+            Ok(Value::List(parts))
+        }
+        _ => Err("scinde(s, sep) expects two verba arguments".into()),
+    }
+}
+
+fn builtin_tonde(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Str(s)] => Ok(Value::Str(s.trim().to_string())),
+        _ => Err("tonde(s) expects one verba argument".into()),
+    }
+}
+
+fn builtin_continet(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Str(s), Value::Str(sub)] => Ok(Value::Bool(s.contains(sub.as_str()))),
+        _ => Err("continet(s, sub) expects two verba arguments".into()),
+    }
+}
+
+fn builtin_ini(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Str(s), Value::Str(pre)] => Ok(Value::Bool(s.starts_with(pre.as_str()))),
+        _ => Err("ini(s, pre) expects two verba arguments".into()),
+    }
+}
+
+fn builtin_des(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Str(s), Value::Str(suf)] => Ok(Value::Bool(s.ends_with(suf.as_str()))),
+        _ => Err("des(s, suf) expects two verba arguments".into()),
+    }
+}
+
+fn builtin_iunge(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::Str(a), Value::Str(b)] => Ok(Value::Str(format!("{}{}", a, b))),
+        _ => Err("iunge(a, b) expects two verba arguments".into()),
+    }
+}
+
+fn builtin_forma(args: &[Value]) -> Result<Value, String> {
+    // forma(fmt, arg1, arg2, ...) — replaces {} placeholders in order.
+    if args.is_empty() {
+        return Err("forma(fmt, ...) expects at least one argument".into());
+    }
+    let fmt = match &args[0] {
+        Value::Str(s) => s.clone(),
+        _ => return Err("forma: first argument must be a verba format string".into()),
+    };
+    let mut result = String::new();
+    let mut arg_iter = args[1..].iter();
+    let mut chars = fmt.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '{' && chars.peek() == Some(&'}') {
+            chars.next(); // consume '}'
+            match arg_iter.next() {
+                Some(v) => result.push_str(&v.display()),
+                None => result.push_str("{}"),
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    Ok(Value::Str(result))
+}
+
+// ============================================================
+//  Phase 10 — list built-ins
+// ============================================================
+
+fn builtin_ordina(args: &[Value]) -> Result<Value, String> {
+    match args {
+        [Value::List(items)] => {
+            let mut sorted = items.clone();
+            // Sort integers, floats, or strings. Mixed types: error.
+            let all_int   = sorted.iter().all(|v| matches!(v, Value::Int(_)));
+            let all_float = sorted.iter().all(|v| matches!(v, Value::Float(_) | Value::Int(_)));
+            let all_str   = sorted.iter().all(|v| matches!(v, Value::Str(_)));
+            if all_int {
+                sorted.sort_by_key(|v| if let Value::Int(n) = v { *n } else { 0 });
+            } else if all_float {
+                sorted.sort_by(|a, b| {
+                    let fa = match a { Value::Float(x) => *x, Value::Int(n) => *n as f64, _ => 0.0 };
+                    let fb = match b { Value::Float(x) => *x, Value::Int(n) => *n as f64, _ => 0.0 };
+                    fa.partial_cmp(&fb).unwrap_or(std::cmp::Ordering::Equal)
+                });
+            } else if all_str {
+                sorted.sort_by(|a, b| {
+                    let sa = if let Value::Str(s) = a { s.as_str() } else { "" };
+                    let sb = if let Value::Str(s) = b { s.as_str() } else { "" };
+                    sa.cmp(sb)
+                });
+            } else {
+                return Err("ordina: list must contain all numerus, all realis, or all verba".into());
+            }
+            Ok(Value::List(sorted))
+        }
+        _ => Err("ordina(list) expects one series argument".into()),
+    }
+}
 
 fn builtin_numera(args: &[Value]) -> Result<Value, String> {
     match args {

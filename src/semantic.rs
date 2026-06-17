@@ -152,6 +152,59 @@ impl Analyzer {
             kind: SymbolKind::Function { params: vec![Ty::Str], ret: Ty::Real },
         });
 
+        // Phase 10: math built-ins
+        for name in &["rad","log","sin","cos","abs"] {
+            self.table.declare(name, SymbolInfo {
+                kind: SymbolKind::Function { params: vec![Ty::Real], ret: Ty::Real },
+            });
+        }
+        self.table.declare("sors", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![], ret: Ty::Real },
+        });
+        self.table.declare("pot", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Real, Ty::Real], ret: Ty::Real },
+        });
+        self.table.declare("min", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Real, Ty::Real], ret: Ty::Real },
+        });
+        self.table.declare("max", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Real, Ty::Real], ret: Ty::Real },
+        });
+
+        // Phase 10: string built-ins
+        self.table.declare("lon", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Str], ret: Ty::Num },
+        });
+        self.table.declare("ind", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Str, Ty::Num], ret: Ty::Str },
+        });
+        self.table.declare("scinde", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Str, Ty::Str], ret: Ty::List(Box::new(Ty::Str)) },
+        });
+        self.table.declare("tonde", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Str], ret: Ty::Str },
+        });
+        self.table.declare("continet", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Str, Ty::Str], ret: Ty::Bool },
+        });
+        self.table.declare("ini", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Str, Ty::Str], ret: Ty::Bool },
+        });
+        self.table.declare("des", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Str, Ty::Str], ret: Ty::Bool },
+        });
+        self.table.declare("iunge", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![Ty::Str, Ty::Str], ret: Ty::Str },
+        });
+        self.table.declare("forma", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![], ret: Ty::Str },
+        });
+
+        // Phase 10: list built-ins
+        self.table.declare("ordina", SymbolInfo {
+            kind: SymbolKind::Function { params: vec![], ret: Ty::List(Box::new(Ty::Num)) },
+        });
+
         // Pass 1a: declare type names (genus, actor, nuntius)
         for item in &program.items {
             match item {
@@ -783,6 +836,22 @@ impl Analyzer {
             // 'scribe' is the variadic built-in: accept any args
             if fname == "scribe" {
                 return Ty::Nihil;
+            }
+            // 'forma' is variadic: first arg is format string, rest are values
+            if fname == "forma" {
+                return Ty::Str;
+            }
+            // math built-ins accept both numerus and realis
+            if matches!(fname.as_str(), "rad"|"log"|"sin"|"cos"|"abs"|"pot"|"min"|"max"|"sors") {
+                return Ty::Real;
+            }
+            // ordina accepts a list of any element type, returns same
+            if fname == "ordina" {
+                if arg_types.len() == 1 {
+                    return arg_types[0].clone();
+                }
+                self.errors.push("'ordina' takes exactly one series argument".to_string());
+                return Ty::Unknown;
             }
             // 'lege' takes an optional verba prompt and returns a verba
             if fname == "lege" {
