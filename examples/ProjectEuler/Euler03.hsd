@@ -1,0 +1,16 @@
+munus principale() -> nihil
+	sit n = 600851475143
+	sit x = 2
+	sit risultato = 0
+
+	dum x * x <= n
+		si n % x == 0
+			risultato = x
+			n = n / x
+		aliter
+			x = x + 1
+
+	si n > 1
+		risultato = n
+
+	scribe("il risultato e': ", risultato)

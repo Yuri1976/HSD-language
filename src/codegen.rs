@@ -14,9 +14,9 @@
 //    — Phase 6b: ARC integration for hsd_list_num and actor pointers
 //    — Phase 6c: ARC integration for verba (strings)
 //    — Phase 6d: reassignment releases the old value
-//    — Phase 8b: genus records (struct, crea with named args, field access)
 //
-//  Still NOT covered: series[verba/realis], list literals like [1, 2, 3].
+//  Still NOT covered: genus (records), series[verba/realis],
+//  list literals like [1, 2, 3].
 // ============================================================
 
 #![allow(dead_code)]
@@ -32,8 +32,6 @@ pub struct CodeGen {
     state_vars: HashMap<String, String>,   // actor state fields (when in a handler)
     current_actor: Option<String>,         // the actor whose handler is being emitted
     tmp_counter: usize,                    // unique names for temporaries
-    // Phase 8b: genus name -> ordered list of (field_name, c_type)
-    genus_fields: HashMap<String, Vec<(String, String)>>,
 
     // Phase 6b — ARC scope tracking.
     // Each entry on the stack is a list of (var_name, c_type) for
@@ -56,14 +54,12 @@ impl CodeGen {
             state_vars: HashMap::new(),
             current_actor: None,
             tmp_counter: 0,
-            genus_fields: HashMap::new(),
             scope_stack: Vec::new(),
             in_nativum: false,
         }
     }
 
     pub fn generate(&mut self, program: &Program) -> Result<String, String> {
-        // Pass 0: collect function return types and genus field layouts.
         for item in &program.items {
             match item {
                 Item::Function(f) => {
@@ -73,12 +69,8 @@ impl CodeGen {
                     };
                     self.func_ret.insert(f.name.clone(), ret);
                 }
-                Item::Genus(g) => {
-                    let mut fields = Vec::new();
-                    for f in &g.fields {
-                        fields.push((f.name.clone(), c_type(&f.ty)?));
-                    }
-                    self.genus_fields.insert(g.name.clone(), fields);
+                Item::Genus(_) => {
+                    return Err("the C backend does not support 'genus' yet".into());
                 }
                 _ => {}
             }
@@ -87,20 +79,9 @@ impl CodeGen {
         // ---- 1. Includes ----
         self.out.push_str("#include <stdio.h>\n");
         self.out.push_str("#include <stdlib.h>\n");
-        self.out.push_str("#include <string.h>\n");
-        self.out.push_str("#include <math.h>\n");
         self.out.push_str("#include \"runtime.h\"\n\n");
 
-        // ---- 2. Genus typedefs (forward declarations) ----
-        let has_genus = program.items.iter().any(|i| matches!(i, Item::Genus(_)));
-        for item in &program.items {
-            if let Item::Genus(g) = item {
-                self.out.push_str(&format!("typedef struct {} {};\n", g.name, g.name));
-            }
-        }
-        if has_genus { self.out.push('\n'); }
-
-        // ---- 3. Actor typedefs ----
+        // ---- 2. Actor typedefs ----
         let has_actor = program.items.iter().any(|i| matches!(i, Item::Actor(_)));
         for item in &program.items {
             if let Item::Actor(a) = item {
@@ -109,30 +90,19 @@ impl CodeGen {
         }
         if has_actor { self.out.push('\n'); }
 
-        // ---- 4. Genus struct definitions ----
-        for item in &program.items {
-            if let Item::Genus(g) = item {
-                self.gen_genus_struct(g)?;
-            }
-        }
-
-        // ---- 5. Actor struct definitions ----
+        // ---- 3. Actor struct definitions ----
         for item in &program.items {
             if let Item::Actor(a) = item {
                 self.gen_actor_struct(a)?;
             }
         }
 
-        // ---- 6. Forward declarations ----
+        // ---- 4. Forward declarations ----
         for item in &program.items {
             match item {
                 Item::Function(f) => {
                     let sig = self.func_signature(f)?;
                     self.out.push_str(&sig);
-                    self.out.push_str(";\n");
-                }
-                Item::Genus(g) => {
-                    self.out.push_str(&self.genus_ctor_sig(g)?);
                     self.out.push_str(";\n");
                 }
                 Item::Actor(a) => {
@@ -148,7 +118,7 @@ impl CodeGen {
         }
         self.out.push('\n');
 
-        // ---- 7. Function bodies ----
+        // ---- 5. Function bodies ----
         for item in &program.items {
             if let Item::Function(f) = item {
                 self.gen_function(f)?;
@@ -156,14 +126,7 @@ impl CodeGen {
             }
         }
 
-        // ---- 8. Genus constructors ----
-        for item in &program.items {
-            if let Item::Genus(g) = item {
-                self.gen_genus_ctor(g)?;
-            }
-        }
-
-        // ---- 9. Actor constructors and handlers ----
+        // ---- 6. Actor constructors and handlers ----
         for item in &program.items {
             if let Item::Actor(a) = item {
                 self.gen_actor_ctor(a)?;
@@ -173,7 +136,7 @@ impl CodeGen {
             }
         }
 
-        // ---- 10. main bridge ----
+        // ---- 7. main bridge ----
         self.out.push_str("int main(void) {\n    principale();\n    return 0;\n}\n");
 
         Ok(self.out.clone())
@@ -323,44 +286,6 @@ impl CodeGen {
 
         self.indent = 0;
         self.out.push_str("}\n");
-        Ok(())
-    }
-
-    // -------- genus records (Phase 8b) --------
-
-    fn gen_genus_struct(&mut self, g: &GenusDef) -> Result<(), String> {
-        self.out.push_str(&format!("struct {} {{\n", g.name));
-        for f in &g.fields {
-            self.out.push_str(&format!("    {} {};\n", c_type(&f.ty)?, f.name));
-        }
-        self.out.push_str("};\n\n");
-        Ok(())
-    }
-
-    fn genus_ctor_sig(&self, g: &GenusDef) -> Result<String, String> {
-        let mut params = Vec::new();
-        for f in &g.fields {
-            params.push(format!("{} {}", c_type(&f.ty)?, f.name));
-        }
-        let params = if params.is_empty() {
-            "void".to_string()
-        } else {
-            params.join(", ")
-        };
-        Ok(format!("{}* hsd_crea_{}({})", g.name, g.name, params))
-    }
-
-    fn gen_genus_ctor(&mut self, g: &GenusDef) -> Result<(), String> {
-        let sig = self.genus_ctor_sig(g)?;
-        self.out.push_str(&sig);
-        self.out.push_str(" {\n");
-        self.out.push_str(&format!(
-            "    {0}* self = ({0}*)hsd_arc_alloc(sizeof({0}));\n", g.name
-        ));
-        for f in &g.fields {
-            self.out.push_str(&format!("    self->{0} = {0};\n", f.name));
-        }
-        self.out.push_str("    return self;\n}\n\n");
         Ok(())
     }
 
@@ -610,13 +535,13 @@ impl CodeGen {
                 }
 
                 self.line(&format!(
-                    "for (long {} = 0; {} < {}.len; {}++) {{",
+                    "for (long long {} = 0; {} < {}.len; {}++) {{",
                     tmp_idx, tmp_idx, tmp_list, tmp_idx
                 ));
                 self.indent += 1;
                 self.enter_scope();
-                self.locals.insert(var.clone(), "long".into());
-                self.line(&format!("long {} = {}.data[{}];", var, tmp_list, tmp_idx));
+                self.locals.insert(var.clone(), "long long".into());
+                self.line(&format!("long long {} = {}.data[{}];", var, tmp_list, tmp_idx));
                 self.gen_block(body)?;
                 self.leave_scope();
                 self.indent -= 1;
@@ -665,33 +590,15 @@ impl CodeGen {
         let mut fmt = String::new();
         let mut exprs = Vec::new();
         for a in args {
-            let ty = self.c_type_of_expr(a)?;
-            // Booleans from continet/ini/des/== are int in C but should
-            // print as verum/falsum like the interpreter does.
-            let is_bool = ty == "int" && matches!(a,
-                Expr::Call { callee, .. } if matches!(callee.as_ref(),
-                    Expr::Ident(n) if matches!(n.as_str(), "continet"|"ini"|"des")
-                )
-            ) || matches!(a, Expr::Binary { op, .. } if matches!(op,
-                crate::ast::BinOp::Eq | crate::ast::BinOp::Neq |
-                crate::ast::BinOp::Lt | crate::ast::BinOp::Gt |
-                crate::ast::BinOp::Le | crate::ast::BinOp::Ge
-            )) || matches!(a, Expr::BoolLit(_));
-
-            if is_bool {
-                fmt.push_str("%s");
-                exprs.push(format!("({} ? \"verum\" : \"falsum\")", self.gen_expr(a, true)?));
-            } else {
-                let spec = match ty.as_str() {
-                    "long"       => "%ld",
-                    "double"     => "%.7g",
-                    "int"        => "%d",
-                    "const char*"=> "%s",
-                    _            => "%ld",
-                };
-                fmt.push_str(spec);
-                exprs.push(self.gen_expr(a, true)?);
-            }
+            let spec = match self.c_type_of_expr(a)?.as_str() {
+                "long long" => "%lld",
+                "double" => "%f",
+                "int" => "%d",
+                "const char*" => "%s",
+                _ => "%lld",
+            };
+            fmt.push_str(spec);
+            exprs.push(self.gen_expr(a, true)?);
         }
         fmt.push_str("\\n");
         if exprs.is_empty() {
@@ -741,23 +648,7 @@ impl CodeGen {
             Expr::Binary { op, left, right } => {
                 let l = self.gen_expr(left, true)?;
                 let r = self.gen_expr(right, true)?;
-                // String equality/inequality must use strcmp, not == / !=,
-                // because const char* comparison in C compares pointers.
-                let l_is_str = self.c_type_of_expr(left)
-                    .map(|t| t == "const char*")
-                    .unwrap_or(false);
-                let r_is_str = self.c_type_of_expr(right)
-                    .map(|t| t == "const char*")
-                    .unwrap_or(false);
-                if (l_is_str || r_is_str) && matches!(op, BinOp::Eq | BinOp::Neq) {
-                    match op {
-                        BinOp::Eq  => Ok(format!("(strcmp({}, {}) == 0)", l, r)),
-                        BinOp::Neq => Ok(format!("(strcmp({}, {}) != 0)", l, r)),
-                        _ => unreachable!(),
-                    }
-                } else {
-                    Ok(format!("({} {} {})", l, c_binop(op), r))
-                }
+                Ok(format!("({} {} {})", l, c_binop(op), r))
             }
             Expr::Call { callee, args } => {
                 if let Expr::Ident(name) = callee.as_ref() {
@@ -793,114 +684,6 @@ impl CodeGen {
                         let b = self.gen_expr(&args[1], true)?;
                         return Ok(format!("hsd_numera({}, {})", a, b));
                     }
-                    // ---- Phase 10: math built-ins ----
-                    if matches!(name.as_str(), "rad"|"log"|"sin"|"cos"|"abs") {
-                        if args.len() != 1 {
-                            return Err(format!("{} expects 1 argument", name));
-                        }
-                        let a = self.gen_expr(&args[0], true)?;
-                        let c_fn = match name.as_str() {
-                            "rad" => "sqrt",
-                            "log" => "log",
-                            "sin" => "sin",
-                            "cos" => "cos",
-                            "abs" => "fabs",
-                            _     => unreachable!(),
-                        };
-                        return Ok(format!("{}((double){})", c_fn, a));
-                    }
-                    if name == "pot" {
-                        if args.len() != 2 {
-                            return Err("pot expects 2 arguments".into());
-                        }
-                        let a = self.gen_expr(&args[0], true)?;
-                        let b = self.gen_expr(&args[1], true)?;
-                        return Ok(format!("pow((double){}, (double){})", a, b));
-                    }
-                    if name == "sors" {
-                        return Ok("((double)rand() / RAND_MAX)".to_string());
-                    }
-                    if matches!(name.as_str(), "min"|"max") {
-                        if args.len() != 2 {
-                            return Err(format!("{} expects 2 arguments", name));
-                        }
-                        let a = self.gen_expr(&args[0], true)?;
-                        let b = self.gen_expr(&args[1], true)?;
-                        return Ok(match name.as_str() {
-                            "min" => format!("((double)({}) < (double)({}) ? (double)({}) : (double)({}))", a, b, a, b),
-                            "max" => format!("((double)({}) > (double)({}) ? (double)({}) : (double)({}))", a, b, a, b),
-                            _ => unreachable!(),
-                        });
-                    }
-                    // ---- Phase 10: string built-ins ----
-                    if name == "lon" {
-                        if args.len() != 1 { return Err("lon expects 1 argument".into()); }
-                        let a = self.gen_expr(&args[0], true)?;
-                        return Ok(format!("((long)strlen({}))", a));
-                    }
-                    if name == "ind" {
-                        if args.len() != 2 { return Err("ind expects 2 arguments".into()); }
-                        let s = self.gen_expr(&args[0], true)?;
-                        let n = self.gen_expr(&args[1], true)?;
-                        // Returns a single-char string on the stack — heap alloc for ARC.
-                        return Ok(format!("hsd_char_at({}, {})", s, n));
-                    }
-                    if name == "scinde" {
-                        if args.len() != 2 { return Err("scinde expects 2 arguments".into()); }
-                        let s = self.gen_expr(&args[0], true)?;
-                        let sep = self.gen_expr(&args[1], true)?;
-                        return Ok(format!("hsd_scinde({}, {})", s, sep));
-                    }
-                    if name == "tonde" {
-                        if args.len() != 1 { return Err("tonde expects 1 argument".into()); }
-                        let a = self.gen_expr(&args[0], true)?;
-                        return Ok(format!("hsd_tonde({})", a));
-                    }
-                    if name == "continet" {
-                        if args.len() != 2 { return Err("continet expects 2 arguments".into()); }
-                        let s = self.gen_expr(&args[0], true)?;
-                        let sub = self.gen_expr(&args[1], true)?;
-                        return Ok(format!("(strstr({}, {}) != NULL)", s, sub));
-                    }
-                    if name == "ini" {
-                        if args.len() != 2 { return Err("ini expects 2 arguments".into()); }
-                        let s = self.gen_expr(&args[0], true)?;
-                        let pre = self.gen_expr(&args[1], true)?;
-                        return Ok(format!("(strncmp({}, {}, strlen({})) == 0)", s, pre, pre));
-                    }
-                    if name == "des" {
-                        if args.len() != 2 { return Err("des expects 2 arguments".into()); }
-                        let s = self.gen_expr(&args[0], true)?;
-                        let suf = self.gen_expr(&args[1], true)?;
-                        return Ok(format!("hsd_des({}, {})", s, suf));
-                    }
-                    if name == "iunge" {
-                        if args.len() != 2 { return Err("iunge expects 2 arguments".into()); }
-                        let a = self.gen_expr(&args[0], true)?;
-                        let b = self.gen_expr(&args[1], true)?;
-                        return Ok(format!("hsd_iunge({}, {})", a, b));
-                    }
-                    if name == "forma" {
-                        // forma in the C backend: not yet supported (requires
-                        // variadic string formatting). Use scribe for output,
-                        // or iunge for simple concatenation. Full support in Phase 11.
-                        return Err(
-                            "'forma' is not yet supported in the C backend. \
-                             Use 'scribe' for output or 'iunge' for concatenation.".into()
-                        );
-                    }
-                    // ---- Phase 10: list built-ins ----
-                    if name == "scinde" {
-                        // scinde returns series[verba] which requires Phase 11.
-                        return Err(
-                            "'scinde' is not yet supported in the C backend (requires Phase 11 series[verba]).".into()
-                        );
-                    }
-                    if name == "ordina" {
-                        if args.len() != 1 { return Err("ordina expects 1 argument".into()); }
-                        let a = self.gen_expr(&args[0], true)?;
-                        return Ok(format!("hsd_ordina({})", a));
-                    }
                     if name == "scribe" {
                         return Err("'scribe' cannot be used as an expression here".into());
                     }
@@ -916,53 +699,27 @@ impl CodeGen {
                 }
             }
             Expr::Create { name, args } => {
-                if args.is_empty() {
-                    // Actor creation (no arguments).
-                    Ok(format!("hsd_crea_{}()", name))
-                } else {
-                    // Genus record creation with named arguments.
-                    // Arguments are named in HSD but the C constructor is
-                    // positional (declaration order). Re-order accordingly.
-                    let field_order = match self.genus_fields.get(name) {
-                        Some(f) => f.clone(),
-                        None => return Err(format!(
-                            "'crea {}': unknown genus (not registered in codegen)", name
-                        )),
-                    };
-                    let mut ordered_args: Vec<String> = Vec::new();
-                    for (field_name, _) in &field_order {
-                        let expr = args.iter()
-                            .find(|(k, _)| k == field_name)
-                            .map(|(_, e)| e)
-                            .ok_or_else(|| format!(
-                                "'crea {}': missing field '{}' in codegen", name, field_name
-                            ))?;
-                        ordered_args.push(self.gen_expr(expr, false)?);
-                    }
-                    Ok(format!("hsd_crea_{}({})", name, ordered_args.join(", ")))
+                if !args.is_empty() {
+                    return Err(
+                        "'crea' does not take arguments; state is set by 'sit' fields".into(),
+                    );
                 }
+                Ok(format!("hsd_crea_{}()", name))
             }
-
-            Expr::Field { object, name: field_name } => {
-                let obj = self.gen_expr(object, true)?;
-                Ok(format!("{}->{}", obj, field_name))
-            }
-
             Expr::Index { object, index } => {
                 let o = self.gen_expr(object, true)?;
                 let i = self.gen_expr(index, true)?;
                 Ok(format!("{}.data[{}]", o, i))
             }
-
-            Expr::List(_) => {
-                Err("list literals are not yet supported by the C backend".into())
+            Expr::Field { .. } | Expr::List(_) => {
+                Err("this construct is not supported by the C backend yet".into())
             }
         }
     }
 
     fn c_type_of_expr(&self, expr: &Expr) -> Result<String, String> {
         match expr {
-            Expr::IntLit(_) => Ok("long".into()),
+            Expr::IntLit(_) => Ok("long long".into()),
             Expr::FloatLit(_) => Ok("double".into()),
             Expr::BoolLit(_) => Ok("int".into()),
             Expr::StrLit(_) => Ok("const char*".into()),
@@ -970,7 +727,7 @@ impl CodeGen {
                 if let Some(t) = self.state_vars.get(n) {
                     return Ok(t.clone());
                 }
-                Ok(self.locals.get(n).cloned().unwrap_or_else(|| "long".into()))
+                Ok(self.locals.get(n).cloned().unwrap_or_else(|| "long long".into()))
             }
             Expr::Ipse => {
                 if let Some(name) = &self.current_actor {
@@ -993,44 +750,19 @@ impl CodeGen {
             Expr::Call { callee, .. } => {
                 if let Expr::Ident(n) = callee.as_ref() {
                     match n.as_str() {
-                        "lege"       => return Ok("const char*".into()),
-                        "numerus_ex" => return Ok("long".into()),
-                        "realis_ex"  => return Ok("double".into()),
-                        "numera"     => return Ok("hsd_list_num".into()),
-                        // Phase 10 math
-                        "rad"|"log"|"sin"|"cos"|"pot"|"sors"|"abs"|"min"|"max"
-                                     => return Ok("double".into()),
-                        // Phase 10 string
-                        "lon"        => return Ok("long".into()),
-                        "ind"|"tonde"|"iunge"|"forma"
-                                     => return Ok("const char*".into()),
-                        "continet"|"ini"|"des"
-                                     => return Ok("int".into()),
-                        // Phase 10 list
-                        "ordina"     => return Ok("hsd_list_num".into()),
+                        "lege" => return Ok("const char*".into()),
+                        "numerus_ex" => return Ok("long long".into()),
+                        "realis_ex" => return Ok("double".into()),
+                        "numera" => return Ok("hsd_list_num".into()),
                         _ => {}
                     }
-                    Ok(self.func_ret.get(n).cloned().unwrap_or_else(|| "long".into()))
+                    Ok(self.func_ret.get(n).cloned().unwrap_or_else(|| "long long".into()))
                 } else {
-                    Ok("long".into())
+                    Ok("long long".into())
                 }
             }
             Expr::Create { name, .. } => Ok(format!("{}*", name)),
-            Expr::Field { object, name: field_name } => {
-                // Look up the field type from genus_fields.
-                if let Ok(obj_type) = self.c_type_of_expr(object) {
-                    // obj_type is "TypeName*" — strip the "*"
-                    if let Some(type_name) = obj_type.strip_suffix('*') {
-                        if let Some(fields) = self.genus_fields.get(type_name) {
-                            if let Some((_, ft)) = fields.iter().find(|(n, _)| n == field_name) {
-                                return Ok(ft.clone());
-                            }
-                        }
-                    }
-                }
-                Ok("long".into()) // fallback
-            }
-            _ => Ok("long".into()),
+            _ => Ok("long long".into()),
         }
     }
 }
@@ -1038,7 +770,7 @@ impl CodeGen {
 fn c_type(t: &Type) -> Result<String, String> {
     match t {
         Type::Named(n) => match n.as_str() {
-            "numerus" => Ok("long".into()),
+            "numerus" => Ok("long long".into()),
             "realis" => Ok("double".into()),
             "veritas" => Ok("int".into()),
             "nihil" => Ok("void".into()),
@@ -1048,7 +780,7 @@ fn c_type(t: &Type) -> Result<String, String> {
         Type::Generic(name, inner) => {
             if name == "series" {
                 let inner_c = c_type(inner)?;
-                if inner_c == "long" {
+                if inner_c == "long long" {
                     Ok("hsd_list_num".into())
                 } else {
                     Err(format!(

@@ -8,6 +8,9 @@
 // ============================================================
 
 // Standard library modules used in main:
+use std::env;       // read command-line arguments
+use std::fs;        // read files from disk
+use std::process;   // exit with an error code
 
 // ---------- Tokens ----------
 // A Token is "one of" many possible things: a keyword, a
@@ -106,11 +109,8 @@ pub struct Lexer {
 
 impl Lexer {
     pub fn new(source: &str) -> Lexer {
-        // Normalize line endings: strip \r so that \r\n (Windows) and
-        // \n (Unix) are both handled identically throughout the lexer.
-        let normalized: String = source.chars().filter(|&c| c != '\r').collect();
         Lexer {
-            src: normalized.chars().collect(),
+            src: source.chars().collect(),
             pos: 0,
             line: 1,
             column: 1,
@@ -194,17 +194,16 @@ impl Lexer {
 
     fn handle_indentation(&mut self) -> Result<(), String> {
         loop {
-            // Count leading whitespace. Tabs are treated as 4 spaces each,
-            // which is the most common editor default and avoids ambiguity.
-            // Mixing tabs and spaces on the same line is accepted as long as
-            // the resulting column count is consistent.
+            // count the leading spaces
             let mut count = 0;
-            loop {
-                match self.peek() {
-                    Some(' ')  => { self.advance(); count += 1; }
-                    Some('\t') => { self.advance(); count += 4; }
-                    _ => break,
-                }
+            while self.peek() == Some(' ') {
+                self.advance();
+                count += 1;
+            }
+            // tabs are converted to 4 spaces each
+            while self.peek() == Some('\t') {
+                self.advance();
+                count += 4;
             }
             // blank or comment-only line: skip it, do not count
             match self.peek() {
@@ -402,5 +401,4 @@ impl Lexer {
         Ok(())
     }
 }
-
 
