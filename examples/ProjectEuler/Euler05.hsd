@@ -1,0 +1,22 @@
+munus principale ()-> nihil
+
+    sit candidato = 20
+    sit trovato = falsum
+
+    dum non trovato
+        sit i = 1
+        sit divide_tutti = verum
+        
+        dum i <= 20
+            si candidato % i != 0
+                divide_tutti = falsum
+                candidato = candidato + 20
+                frange
+                
+            aliter
+                i = i+1
+            
+        si divide_tutti
+            trovato = verum
+            
+    scribe("il numero piu piccolo e': ", candidato)
