@@ -2,15 +2,7 @@
 //  HSD — Hic Sunt Dracones
 //  Phase 1: the LEXER
 //  Turns source text into a list of tokens.
-//
-//  Build with:  rustc lexer.rs
-//  Run with:    ./lexer examples/test.hsd
 // ============================================================
-
-// Standard library modules used in main:
-use std::env;       // read command-line arguments
-use std::fs;        // read files from disk
-use std::process;   // exit with an error code
 
 // ---------- Tokens ----------
 // A Token is "one of" many possible things: a keyword, a
@@ -401,4 +393,3 @@ impl Lexer {
         Ok(())
     }
 }
-

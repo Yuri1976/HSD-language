@@ -1,0 +1,20 @@
+munus principale() -> nihil
+    sit massimo = 0
+    sit a = 999
+
+    dum a >= 100
+        sit b = a
+        dum b >= 100
+            sit prodotto = a * b
+            sit temp = prodotto
+            sit inverso = 0
+            dum temp > 0
+                inverso = inverso * 10 + temp % 10
+                temp = temp / 10
+            si inverso == prodotto
+                si prodotto > massimo
+                    massimo = prodotto
+            b = b - 1
+        a = a - 1
+
+    scribe("il palindromo piu grande e': ", massimo)
