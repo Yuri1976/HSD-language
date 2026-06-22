@@ -57,15 +57,25 @@ annotations on function signatures with inference inside.
 - **A C compiler**, needed for the backend to produce executables:
   - Linux: `gcc` (usually pre-installed) or `clang`
   - macOS: `clang` (comes with Xcode Command Line Tools)
-  - Windows: Microsoft Visual C++ Build Tools (`cl`), or MinGW
+  - Windows: **Microsoft Visual C++ (`cl`)**, included with
+    [Visual Studio](https://visualstudio.microsoft.com/) or the
+    standalone Build Tools. The HSD tooling (including
+    `hsd-build.ps1`) targets `cl` specifically — MinGW is not
+    tested and may require manual adjustments to the build commands.
+
+  On Windows, `cl` is available in the **Developer PowerShell for VS**
+  or **Developer Command Prompt for VS** that Visual Studio installs.
+  The `hsd-build.ps1` helper script loads the MSVC environment
+  automatically, so you do not need to open those manually when using
+  the script.
 
 ### Building HSD
 
 Clone the repository and build the compiler:
 
 ```sh
-git clone https://github.com/Yuri1976/HSD-language.git
-cd HSD-language
+git clone https://github.com/Yuri1976/HSD---Hic-Sunt-Dracones---PUBLIC.git
+cd HSD---Hic-Sunt-Dracones---PUBLIC
 cargo build --release
 ```
 
@@ -104,6 +114,36 @@ cl examples\factorial.c runtime\runtime.c /I runtime
 The `build` step produces a `.c` file next to the source. The C
 compiler then links it with the HSD runtime library to produce a
 standalone native executable.
+
+### `hsd-build.ps1` — Windows helper script
+
+On Windows, the full build cycle (generate C, compile with `cl`, run)
+involves several steps and requires the MSVC developer environment to
+be active. The included `hsd-build.ps1` script automates all of this
+from a plain PowerShell window, with no need to switch to Developer
+PowerShell manually.
+
+```powershell
+# First time only: allow local scripts to run
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+Unblock-File -Path .\hsd-build.ps1
+
+# Run (asks interactively: interpreter or compiled)
+.\hsd-build.ps1 -File Euler05
+
+# Compiled only, with timed benchmark over 3 runs (warm-up excluded)
+.\hsd-build.ps1 -File Euler05 -Modo build -Benchmark -Runs 3
+
+# Both interpreter and compiled, side-by-side timing comparison
+.\hsd-build.ps1 -File Euler05 -Modo both -Benchmark -Runs 3
+```
+
+The script finds `.hsd` files by name anywhere in the repo, loads the
+MSVC environment automatically if needed, keeps intermediate `.obj`
+files out of the repo (redirected to `%TEMP%\hsd_obj\`), skips
+recompilation when the binary is already up to date, and optionally
+benchmarks execution with a warm-up run excluded from the reported
+average.
 
 ---
 
@@ -156,6 +196,12 @@ Each one is meant to stand on its own.
   management strategy (ARC), why it was chosen, where its limits
   are, and how those limits will be addressed.
 
+- **[HSD-changelog.md](HSD-changelog.md)** — the *what changed*.
+  Incremental fixes, tooling improvements, and engineering notes
+  that don't belong in the roadmap (which tracks phase completion,
+  not day-to-day progress). Useful context for understanding why
+  certain decisions were made.
+
 If you only have time for one document, start with the project
 overview. If you are curious about the technical decisions, the
 memory model document is the deepest dive available.
@@ -172,6 +218,20 @@ specific language features:
 - `10_input.hsd` — reading from standard input, parsing
 - `11_lista.hsd` — list construction, iteration, summation
 - `08_functions.hsd` — function definitions and calls
+
+The `examples/ProjectEuler/` subdirectory contains solutions to
+Project Euler problems written in HSD, verified on both the
+interpreter and compiled binary:
+
+- `Euler01.hsd` — sum of multiples of 3 and 5 below 1000
+- `Euler02.hsd` — sum of even Fibonacci numbers below 4 million
+- `Euler03.hsd` — largest prime factor of 600851475143
+- `Euler04.hsd` — largest palindrome product of two 3-digit numbers
+- `Euler05.hsd` — smallest number divisible by all integers 1 to 20
+
+`HSD-euler05-benchmark.md` documents a three-way performance
+comparison (HSD interpreter, HSD compiled to C, Python 3.14) on
+Euler #5, with methodology and raw numbers.
 
 Each of these can be run through the interpreter or compiled
 through the C backend using the commands above.
