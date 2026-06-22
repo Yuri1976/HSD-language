@@ -1,0 +1,9 @@
+munus principale() -> nihil
+	sit n = 12
+	sit x = 2
+	dum x * x <= n
+		si n % x == 0
+			n = n / x
+		aliter
+			x = x + 1
+	scribe("risultato: ", n)

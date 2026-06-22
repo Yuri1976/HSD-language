@@ -1,0 +1,10 @@
+# Phase 8a — test errori: questo deve dare errore semantico (campo mancante)
+# Esegui e verifica che il compilatore si lamenti di 'y' mancante
+
+genus Punto
+    x: numerus
+    y: numerus
+
+munus principale() -> nihil
+    sit p = crea Punto(x: 3)
+    scribe(p.x)

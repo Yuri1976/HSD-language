@@ -1,0 +1,34 @@
+# lib/geometria.hsd — geometry library
+# Importable via: affer "lib/geometria"
+
+genus Punto
+    x: realis
+    y: realis
+
+genus Cerchio
+    cx: realis
+    cy: realis
+    raggio: realis
+
+genus Rettangolo
+    x: realis
+    y: realis
+    larghezza: realis
+    altezza: realis
+
+munus area_cerchio(c: Cerchio) -> realis
+    redde 3.14159 * c.raggio * c.raggio
+
+munus perimetro_cerchio(c: Cerchio) -> realis
+    redde 2.0 * 3.14159 * c.raggio
+
+munus area_rettangolo(r: Rettangolo) -> realis
+    redde r.larghezza * r.altezza
+
+munus perimetro_rettangolo(r: Rettangolo) -> realis
+    redde 2.0 * (r.larghezza + r.altezza)
+
+munus distanza_quadrata(a: Punto, b: Punto) -> realis
+    sit dx = a.x - b.x
+    sit dy = a.y - b.y
+    redde dx * dx + dy * dy

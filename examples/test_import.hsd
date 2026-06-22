@@ -1,0 +1,5 @@
+affer "lib/geometria"
+
+munus principale() -> nihil
+    sit c = crea Cerchio(raggio: 5.0)
+    scribe("Area: ", area_cerchio(c))

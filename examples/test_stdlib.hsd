@@ -1,0 +1,10 @@
+munus principale() -> nihil
+    scribe("rad(16) = ", rad(16.0))
+    scribe("pot(2, 8) = ", pot(2, 8))
+    scribe("abs(-7) = ", abs(-7))
+    scribe("min(3, 9) = ", min(3, 9))
+    scribe("max(3, 9) = ", max(3, 9))
+    scribe("lon: ", lon("Dracones"))
+    scribe("tonde: '", tonde("  ciao  "), "'")
+    scribe("continet: ", continet("Hic Sunt", "Sunt"))
+    scribe("iunge: ", iunge("Hic ", "Sunt"))

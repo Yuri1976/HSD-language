@@ -1,0 +1,3 @@
+munus principale() -> nihil
+	sit n = 600851475143
+	scribe("n e': ", n)

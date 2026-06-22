@@ -1,0 +1,19 @@
+# Phase 8a — test: record passati a funzioni, uguaglianza strutturale
+
+genus Punto
+    x: numerus
+    y: numerus
+
+munus distanza_quadrata(p: Punto) -> numerus
+    redde p.x * p.x + p.y * p.y
+
+munus principale() -> nihil
+    sit a = crea Punto(x: 3, y: 4)
+    sit b = crea Punto(x: 3, y: 4)
+    sit c = crea Punto(x: 0, y: 0)
+    scribe("dist^2 di a: ", distanza_quadrata(a))
+    scribe("a == b (stesso contenuto): ", a == b)
+    scribe("a == c (diversi): ", a == c)
+    a.x = 10
+    scribe("a.x dopo modifica: ", a.x)
+    scribe("b.x invariato: ", b.x)

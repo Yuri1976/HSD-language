@@ -1,0 +1,12 @@
+# Phase 8a — test base: costruzione, field access, field assign
+
+genus Persona
+    nome: verba
+    eta: numerus
+
+munus principale() -> nihil
+    sit p = crea Persona(nome: "Mario", eta: 30)
+    scribe("Nome: ", p.nome)
+    scribe("Eta: ", p.eta)
+    p.eta = 31
+    scribe("Eta dopo modifica: ", p.eta)
